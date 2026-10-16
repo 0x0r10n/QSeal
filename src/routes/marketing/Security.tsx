@@ -1,0 +1,92 @@
+import { Check, Minus } from 'lucide-react'
+import { PageHero, Prose } from '@/components/marketing/PageHero'
+import { Container } from '@/components/marketing/SectionHeader'
+import { AvailabilityTag } from '@/components/ui/StatusTag'
+import { Reveal, RevealItem } from '@/components/ui/Reveal'
+import { SECURITY_LAYERS } from '@/content/security'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+
+const NOT_CLAIMED = [
+  'End-to-end encryption of prompts to the model',
+  'Hardware trusted execution or remote attestation',
+  'Zero-knowledge proofs of inference',
+  'Guaranteed secrecy of prompts from the operator',
+  'Post-quantum security for Solana wallet signatures',
+]
+
+export default function Security() {
+  useDocumentTitle('Security')
+  return (
+    <>
+      <PageHero
+        eyebrow="Security"
+        title={
+          <>
+            Precise claims. <span className="text-steel-500">Nothing implied.</span>
+          </>
+        }
+        lede="Security is a set of specific properties with specific boundaries. This page lists each layer of QSeal, what it protects, and what it does not."
+      />
+
+      <Container className="py-20 md:py-28">
+        <Reveal as="ol" className="grid gap-4" gap={0.08}>
+          {SECURITY_LAYERS.map((l, i) => (
+            <RevealItem as="li" key={l.id} id={l.id} className="surface scroll-mt-24 rounded-3xl p-7 sm:p-10">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-baseline gap-5">
+                  <span className="font-mono text-xs text-steel-600">0{i + 1}</span>
+                  <h2 className="text-2xl font-medium tracking-[-0.03em] text-steel-50 md:text-[28px]">{l.name}</h2>
+                </div>
+                <AvailabilityTag value={l.status} />
+              </div>
+              <div className="mt-8 grid gap-8 md:grid-cols-2 md:pl-10">
+                <div>
+                  <p className="eyebrow mb-3 flex items-center gap-2 !text-steel-300">
+                    <Check className="size-3.5" /> Covers
+                  </p>
+                  <p className="leading-[1.75] text-steel-300">{l.covers}</p>
+                </div>
+                <div>
+                  <p className="eyebrow mb-3 flex items-center gap-2">
+                    <Minus className="size-3.5" /> Does not claim
+                  </p>
+                  <p className="leading-[1.75] text-steel-500">{l.notClaimed}</p>
+                </div>
+              </div>
+            </RevealItem>
+          ))}
+        </Reveal>
+
+        <div className="mt-20">
+          <Prose title="Explicitly not claimed">
+            <p>Unless a deployment documents otherwise, QSeal does not claim any of the following:</p>
+            <ul className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
+              {NOT_CLAIMED.map((c) => (
+                <li key={c} className="flex items-center gap-4 py-3.5 text-steel-300">
+                  <Minus className="size-4 text-steel-600" /> {c}
+                </li>
+              ))}
+            </ul>
+          </Prose>
+          <Prose title="Why wallets are a separate layer">
+            <p>
+              Solana accounts are secured by Ed25519 signatures, a classical scheme. QSeal uses wallets to establish identity and to
+              settle payments. That is a different job from protecting the integrity of inference records, which is where QSeal’s
+              post-quantum design applies. Keeping the layers separate keeps each claim honest.
+            </p>
+          </Prose>
+          <Prose title="This web application">
+            <p>
+              The app stores your request history only in this browser. An access key you enter is kept in session storage for the
+              current tab and is never logged. The app never displays a receipt as valid unless a configured verifier has actually
+              checked it.
+            </p>
+          </Prose>
+          <Prose title="Reporting a vulnerability">
+            <p>A security contact is published with each production deployment. Please use that channel for coordinated disclosure.</p>
+          </Prose>
+        </div>
+      </Container>
+    </>
+  )
+}
