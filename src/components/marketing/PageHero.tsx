@@ -54,7 +54,7 @@ export function PageHero({ eyebrow, title, lede, children }: { eyebrow: string; 
 
 export function Prose({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className="grid gap-6 border-t border-white/[0.07] py-14 md:grid-cols-[0.8fr_1.4fr] md:gap-16 md:py-20">
+    <div className="grid gap-6 border-t border-white/[0.07] py-14 md:grid-cols-[0.8fr_1.4fr] md:gap-16 md:py-20 [&>*]:min-w-0">
       <div>
         <h2 className="text-2xl font-medium tracking-[-0.03em] text-steel-50 md:text-[28px]">{title}</h2>
         {aside && <div className="mt-4">{aside}</div>}

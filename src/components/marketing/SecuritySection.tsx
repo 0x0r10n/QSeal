@@ -29,7 +29,7 @@ export function SecuritySection() {
   }, [])
 
   return (
-    <section aria-labelledby="security-title" className="relative py-28 md:py-40">
+    <section aria-labelledby="security-title" className="relative overflow-x-clip py-28 md:py-40">
       <Container>
         <SectionHeader
           index="03"
@@ -60,7 +60,7 @@ export function SecuritySection() {
                   ref={(el) => {
                     items.current[i] = el
                   }}
-                  className="border-t border-white/[0.07] last:border-b lg:min-h-[44vh] lg:py-6"
+                  className="border-t border-white/[0.07] last:border-b lg:min-h-[32vh] lg:py-6"
                 >
                   <button
                     type="button"

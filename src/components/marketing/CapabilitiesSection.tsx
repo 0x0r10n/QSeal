@@ -22,7 +22,7 @@ function ModelsTile() {
 
   return (
     <SpotlightCard className="flex h-full flex-col p-7 sm:p-9">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col-reverse items-start justify-between gap-4 sm:flex-row">
         <div>
           <p className="eyebrow">Model catalogue</p>
           <h3 className="mt-4 max-w-sm text-2xl font-medium tracking-[-0.03em] text-steel-50 sm:text-[28px]">

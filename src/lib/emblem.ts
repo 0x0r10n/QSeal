@@ -88,6 +88,16 @@ export function dissolveAt(theta: number) {
   return t * t * (3 - 2 * t)
 }
 
+/** Distance-aware test: is (x, y) inside the tail blade, grown by `margin`? */
+function nearTail(x: number, y: number, margin: number) {
+  const [tl, tr, br] = TAIL
+  if (y > tl[1] + margin || y < br[1] - margin) return false
+  const t = (tl[1] - y) / (tl[1] - br[1])
+  const left = tl[0] + (TAIL[3][0] - tl[0]) * t
+  const right = tr[0] + (br[0] - tr[0]) * t
+  return x > left - margin && x < right + margin
+}
+
 function lerp(a: Pt, b: Pt, t: number): Pt {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
 }
@@ -131,7 +141,7 @@ export function buildEmblem({ detail = 'full', seed = 7 }: EmblemOptions = {}): 
   const pitch = (2 * OUTER) / columns
   const bars: Fragment[] = []
   const cubes: Cube[] = []
-  const pickShade = (): Shade => (r() < 0.38 ? 2 : r() < 0.55 ? 1 : 0) as Shade
+  const pickShade = (): Shade => (r() < 0.45 ? 2 : r() < 0.6 ? 1 : 0) as Shade
 
   for (let c = 0; c < columns; c++) {
     const xc = -OUTER + pitch * (c + 0.5)
@@ -170,6 +180,7 @@ export function buildEmblem({ detail = 'full', seed = 7 }: EmblemOptions = {}): 
           continue
         }
         if (detail === 'mark' && dis > 0.75) continue
+        if (nearTail(x, y, w / 2 + 0.03) || nearTail(x, a, w / 2 + 0.03) || nearTail(x, b, w / 2 + 0.03)) continue
         bars.push({ x, y, w, h: b - a, z: detail === 'full' ? (r() - 0.5) * 0.18 : 0, d: 0.1 + r() * 0.14, shade: pickShade() })
       }
     }
@@ -193,7 +204,7 @@ export function buildEmblem({ detail = 'full', seed = 7 }: EmblemOptions = {}): 
 
   const B = EMBLEM_BOUNDS
   const inside = cubes.filter(
-    (c) => c.x + c.s / 2 <= B.maxX && c.y + c.s / 2 <= B.maxY && c.y - c.s / 2 >= B.minY,
+    (c) => !nearTail(c.x, c.y, c.s / 2 + 0.02) && c.x + c.s / 2 <= B.maxX && c.y + c.s / 2 <= B.maxY && c.y - c.s / 2 >= B.minY,
   )
   return { bars, cubes: inside, tail: buildTail(detail) }
 }

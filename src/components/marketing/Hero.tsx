@@ -56,7 +56,7 @@ export function Hero() {
       {/* Sculpture */}
       <motion.div
         style={{ scale: sceneScale, opacity: sceneOpacity }}
-        className="pointer-events-none absolute inset-x-0 top-[9vh] -z-10 mx-auto h-[56svh] max-w-[1400px] md:inset-y-0 md:top-0 md:h-auto"
+        className="pointer-events-none absolute inset-x-0 top-[8svh] -z-10 mx-auto h-[46svh] max-w-[1400px] md:inset-y-0 md:top-0 md:h-auto"
       >
         <div className="absolute inset-0 md:left-[42%]">
           {/* Static fallback — always present, cross-fades out once WebGL is ready */}
@@ -86,7 +86,7 @@ export function Hero() {
       {/* Copy */}
       <motion.div
         style={{ y: copyY, opacity: copyOpacity }}
-        className="relative mx-auto flex w-full max-w-[1400px] flex-1 flex-col justify-end px-5 pb-14 pt-[52svh] sm:px-8 md:justify-center md:pb-24 md:pt-28 lg:px-12"
+        className="relative mx-auto flex w-full max-w-[1400px] flex-1 flex-col justify-end px-5 pb-14 pt-[55svh] sm:px-8 md:justify-center md:pb-24 md:pt-28 lg:px-12"
       >
         <div className="max-w-[640px]">
           <motion.p

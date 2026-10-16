@@ -15,7 +15,7 @@ export function DeveloperSection() {
     <section aria-labelledby="dev-title" className="relative overflow-hidden border-y border-white/[0.05] bg-ink-1000 py-28 md:py-40">
       <div aria-hidden className="pointer-events-none absolute -right-40 top-20 size-[600px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.05),transparent_65%)]" />
       <Container>
-        <div className="grid items-center gap-16 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
+        <div className="grid items-center gap-16 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20 [&>*]:min-w-0">
           <div>
             <SectionHeader
               index="04"

@@ -21,8 +21,8 @@ function useMaterials() {
     const make = (color: string, roughness: number) =>
       new THREE.MeshStandardMaterial({ color, metalness: 1, roughness, envMapIntensity: 1.3 })
     return {
-      0: make('#1a1b1e', 0.22), // black chrome
-      1: make('#8e9097', 0.28), // steel
+      0: make('#2a2b30', 0.2), // black chrome
+      1: make('#a3a5ac', 0.24), // steel
       2: make('#e4e6ea', 0.12), // bright chrome
     } as Record<Shade, THREE.MeshStandardMaterial>
   }, [])
@@ -31,7 +31,7 @@ function useMaterials() {
 const box = new THREE.BoxGeometry(1, 1, 1)
 const tmp = new THREE.Object3D()
 
-function Sculpture({ progress }: { progress: MotionValue<number> }) {
+function Sculpture({ progress, compact }: { progress: MotionValue<number>; compact?: boolean }) {
   const group = useRef<THREE.Group>(null)
   const emblem = useMemo(() => buildEmblem({ detail: 'full' }), [])
   const mats = useMaterials()
@@ -130,7 +130,7 @@ function Sculpture({ progress }: { progress: MotionValue<number> }) {
   })
 
   return (
-    <group ref={group} scale={scale} position={[-0.22 * scale, 0, 0]}>
+    <group ref={group} scale={scale} position={[(compact ? -0.24 : -0.22) * scale, 0, 0]}>
       {groups.map((grp, gi) => (
         <group key={grp.shade}>
           {grp.bars.length > 0 && (
@@ -170,6 +170,8 @@ function Studio() {
       <Lightformer form="rect" intensity={1.8} position={[3.4, 0, 1.6]} scale={[0.4, 9, 1]} rotation-y={-Math.PI / 2.4} />
       <Lightformer form="rect" intensity={1.3} position={[0, 4.5, -1]} scale={[8, 0.6, 1]} rotation-x={Math.PI / 2} />
       <Lightformer form="rect" intensity={0.7} position={[0, 0, -5]} scale={[10, 2, 1]} />
+      {/* Soft key from the viewer's side so front faces catch light */}
+      <Lightformer form="rect" intensity={1.1} position={[0.8, 0.6, 6]} scale={[5, 2.2, 1]} />
       <Lightformer form="rect" intensity={0.5} position={[0, -4, 1]} scale={[6, 0.4, 1]} rotation-x={-Math.PI / 2} />
     </Environment>
   )
@@ -207,7 +209,7 @@ export default function HeroScene({ progress, active, onReady, compact }: SceneP
       <ambientLight intensity={0.12} />
       <directionalLight position={[3, 4, 5]} intensity={0.6} />
       <Studio />
-      <Sculpture progress={progress} />
+      <Sculpture progress={progress} compact={compact} />
       <ReadySignal onReady={onReady} />
     </Canvas>
   )

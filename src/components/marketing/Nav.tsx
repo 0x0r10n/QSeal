@@ -83,9 +83,11 @@ export function Nav() {
             >
               Sign In
             </Link>
-            <ButtonLink to="/app" size="sm" className="hidden h-9 px-4 sm:inline-flex">
-              Launch App <ArrowRight className="size-3.5" />
-            </ButtonLink>
+            <span className="hidden sm:block">
+              <ButtonLink to="/app" size="sm" className="h-9 px-4">
+                Launch App <ArrowRight className="size-3.5" />
+              </ButtonLink>
+            </span>
             <button
               type="button"
               aria-label={open ? 'Close menu' : 'Open menu'}

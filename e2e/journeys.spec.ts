@@ -9,11 +9,14 @@ test.describe('public site', () => {
   })
 
   test('has no horizontal overflow', async ({ page }) => {
-    for (const path of ['/', '/technology', '/security', '/docs', '/sign-in']) {
+    const width = page.viewportSize()!.width
+    for (const path of ['/', '/technology', '/security', '/docs', '/sign-in', '/app', '/app/new', '/app/history']) {
       await page.goto(path)
-      await page.waitForTimeout(300)
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-      expect(overflow, path).toBeLessThanOrEqual(0)
+      await page.waitForTimeout(400)
+      // On mobile, overflowing content widens the layout viewport itself.
+      const { inner, scroll } = await page.evaluate(() => ({ inner: window.innerWidth, scroll: document.documentElement.scrollWidth }))
+      expect(inner, path).toBe(width)
+      expect(scroll, path).toBeLessThanOrEqual(width)
     }
   })
 
