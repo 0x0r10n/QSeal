@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Search, Trash2 } from 'lucide-react'
 import { PageHeader, Panel, StatePanel, fieldClass } from '@/components/application/ui'
-import { Button, ButtonLink } from '@/components/ui/Button'
+import { ButtonLink } from '@/components/ui/Button'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 import { HistoryList } from '@/features/history/HistoryList'
 import { historyStore, useHistory, type RequestStatus } from '@/features/history/store'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -38,15 +39,9 @@ export default function History() {
         description="Requests sent from this browser. The backend’s account-level history is not connected, so nothing here comes from other devices."
         actions={
           entries.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (confirm('Clear all local request history? This cannot be undone.')) historyStore.clear()
-              }}
-            >
+            <ConfirmButton onConfirm={() => historyStore.clear()} confirmLabel="Clear all? Click again">
               <Trash2 className="size-3.5" /> Clear local history
-            </Button>
+            </ConfirmButton>
           )
         }
       />

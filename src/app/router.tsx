@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, createHashRouter } from 'react-router-dom'
 import { MarketingLayout } from '@/layouts/MarketingLayout'
 import { AppLayout } from '@/layouts/AppLayout'
 import Home from '@/routes/marketing/Home'
@@ -13,7 +13,10 @@ function page(load: () => Promise<{ default: ComponentType }>) {
   )
 }
 
-export const router = createBrowserRouter([
+// Static hosts without SPA fallback (e.g. a preview bundle) can opt into hash routing.
+const createRouter = import.meta.env.VITE_ROUTER === 'hash' ? createHashRouter : createBrowserRouter
+
+export const router = createRouter([
   {
     element: <MarketingLayout />,
     children: [

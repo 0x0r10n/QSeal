@@ -5,6 +5,7 @@ import { PageHeader, Panel } from '@/components/application/ui'
 import { BackendStatusPill } from '@/components/application/BackendStatus'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { StatusTag } from '@/components/ui/StatusTag'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 import { useBackendStatus } from '@/hooks/useModels'
 import { setPrefs, usePrefs, type Prefs } from '@/hooks/usePrefs'
 import { useAccessKey } from '@/hooks/useAccessKey'
@@ -128,16 +129,9 @@ export default function Settings() {
 
         <Panel title="Local data">
           <Row label="Request history" hint={`${history.length} request${history.length === 1 ? '' : 's'} stored in this browser.`}>
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={history.length === 0}
-              onClick={() => {
-                if (confirm('Clear all local request history?')) historyStore.clear()
-              }}
-            >
+            <ConfirmButton variant="danger" disabled={history.length === 0} onConfirm={() => historyStore.clear()} confirmLabel="Click again to clear">
               Clear history
-            </Button>
+            </ConfirmButton>
           </Row>
         </Panel>
       </div>
