@@ -231,7 +231,7 @@ export default function NewRequest() {
             }}
             className="surface overflow-hidden rounded-2xl"
           >
-            <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
               <label htmlFor="model" className="sr-only">Model</label>
               <ModelLogo vendor={selected?.vendor} size="sm" />
               <div className="relative">
@@ -243,7 +243,7 @@ export default function NewRequest() {
                     setUnusedPayment(null)
                   }}
                   disabled={modelOptions.length === 0 || busy}
-                  className={cn(fieldClass, 'h-9 min-w-[210px] max-w-[min(100%,360px)] appearance-none truncate pr-9 text-[12.5px]')}
+                  className={cn(fieldClass, 'h-8 min-w-[200px] max-w-[min(100%,340px)] appearance-none truncate pr-9 text-[12px]')}
                 >
                   {modelOptions.length === 0 && (
                     <option value="">
@@ -254,9 +254,9 @@ export default function NewRequest() {
                     <option key={m.id} value={m.id}>{m.family ? `${m.family} · ${m.id}` : m.id}</option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-steel-500" />
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-steel-500" />
               </div>
-              {price !== undefined && <span className="font-mono text-[11.5px] text-steel-400">{usdc(price)} / request</span>}
+              {price !== undefined && <span className="font-mono text-[11px] text-steel-400">{usdc(price)} / request</span>}
               <button
                 type="button"
                 onClick={() => setSeal((v) => !v)}
@@ -264,7 +264,7 @@ export default function NewRequest() {
                 aria-pressed={seal}
                 title="Encrypt this request to the gateway’s ML-KEM-768 key. The gateway decrypts it in memory to run the model."
                 className={cn(
-                  'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition disabled:opacity-40',
+                  'inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-[11px] transition disabled:opacity-40',
                   seal ? 'border-white/25 bg-white/[0.08] text-steel-50' : 'border-white/10 text-steel-400 hover:text-steel-100',
                 )}
               >
@@ -274,7 +274,7 @@ export default function NewRequest() {
               <button
                 type="button"
                 onClick={() => setShowSystem((v) => !v)}
-                className="ml-auto text-[12.5px] text-steel-400 hover:text-steel-100"
+                className="ml-auto text-[12px] text-steel-400 hover:text-steel-100"
                 aria-expanded={showSystem}
               >
                 {showSystem ? 'Hide' : 'Add'} system prompt
@@ -296,9 +296,9 @@ export default function NewRequest() {
                     value={system}
                     onChange={(e) => setSystem(e.target.value)}
                     disabled={busy}
-                    rows={3}
+                    rows={2}
                     placeholder="System prompt (optional)"
-                    className="block w-full resize-y bg-transparent px-5 py-4 font-mono text-[13px] leading-relaxed text-steel-200 placeholder:text-steel-600 focus:outline-none"
+                    className="block w-full resize-y bg-transparent px-4 py-2.5 font-mono text-[12.5px] leading-relaxed text-steel-200 placeholder:text-steel-600 focus:outline-none"
                   />
                 </motion.div>
               )}
@@ -316,12 +316,12 @@ export default function NewRequest() {
                 }
               }}
               disabled={busy}
-              rows={10}
+              rows={5}
               placeholder="Ask anything. Nothing is sent until you press Seal & send."
-              className="block min-h-[240px] w-full resize-y bg-transparent px-5 py-5 text-[15.5px] leading-[1.7] text-steel-50 placeholder:text-steel-600 focus:outline-none"
+              className="block min-h-[140px] max-h-[420px] w-full resize-y bg-transparent px-4 py-3.5 text-[14.5px] leading-[1.6] text-steel-50 placeholder:text-steel-600 focus:outline-none"
             />
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.06] px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.06] px-4 py-2.5">
               <span className="font-mono text-[11px] tabular-nums text-steel-600">{prompt.length.toLocaleString()} chars</span>
               <span className="hidden items-center gap-1 font-mono text-[11px] text-steel-600 sm:inline-flex">
                 <CornerDownLeft className="size-3" /> ⌘/Ctrl + Enter

@@ -37,7 +37,6 @@ export function Topbar() {
         <p className="min-w-0 truncate text-[13px] text-steel-100">{label}</p>
 
         <div className="ml-auto flex items-center gap-2">
-          <BackendStatusPill className="hidden sm:inline-flex" />
           <div className="hidden md:block">
             <WalletMenu />
           </div>

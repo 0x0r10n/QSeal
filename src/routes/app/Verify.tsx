@@ -55,7 +55,7 @@ export default function Verify() {
         actions={verificationConfigured() ? <StatusTag tone="ok">Gateway keys available</StatusTag> : <StatusTag tone="warn">No gateway connected</StatusTag>}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <Panel title="Receipt" bodyClassName="p-0">
           <div
             onDragOver={(e) => {
@@ -78,10 +78,10 @@ export default function Verify() {
                 setText(e.target.value)
                 setOutcome(null)
               }}
-              rows={16}
+              rows={8}
               spellCheck={false}
               placeholder={'Paste receipt JSON or a receipt ID (rcpt_…), or drop a .json file'}
-              className={cn(fieldClass, 'block min-h-[360px] resize-y rounded-none border-0 bg-transparent px-5 py-5 font-mono text-[12.5px] leading-relaxed')}
+              className={cn(fieldClass, 'block min-h-[180px] max-h-[460px] resize-y rounded-none border-0 bg-transparent px-4 py-3.5 font-mono text-[12.5px] leading-relaxed')}
             />
             {drag && (
               <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-xl border border-dashed border-white/25 text-sm text-steel-200">
@@ -89,7 +89,7 @@ export default function Verify() {
               </div>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] px-4 py-2.5">
             <input ref={fileRef} type="file" accept="application/json,.json,.txt" className="hidden" onChange={(e) => void loadFile(e.target.files?.[0])} />
             <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
               <Upload className="size-3.5" /> Load file
