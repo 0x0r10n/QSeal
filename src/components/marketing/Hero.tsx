@@ -152,8 +152,8 @@ export function Hero() {
         >
           {[
             ['Interface', 'OpenAI-compatible endpoints'],
-            ['Records', 'Signed inference receipts'],
-            ['Access', 'Solana wallet · prepaid keys'],
+            ['Records', 'ML-DSA-65 signed receipts'],
+            ['Payment', 'USDC on Solana · x402'],
           ].map(([k, v]) => (
             <div key={k}>
               <dt className="eyebrow !text-[10px]">{k}</dt>

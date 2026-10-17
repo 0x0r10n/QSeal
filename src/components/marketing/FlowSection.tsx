@@ -9,31 +9,31 @@ import { useReducedMotion } from '@/hooks/useMediaQuery'
 const STEPS: Array<{ title: string; body: string; icon: typeof Send; status: Availability; code: string }> = [
   {
     title: 'Request',
-    body: 'Your application or agent calls an OpenAI-compatible endpoint with a model and a list of messages.',
+    body: 'Your app or agent calls the OpenAI-compatible endpoint, optionally sealing the prompt with ML-KEM-768, and pays with a prepaid key or an x402 USDC transfer.',
     icon: Send,
     status: 'available',
     code: 'POST /v1/chat/completions',
   },
   {
     title: 'Processing',
-    body: 'QSeal runs the inference on the selected model and returns the completion to the caller.',
+    body: 'The gateway checks payment, unseals the prompt in memory, runs it on the selected model, and keeps no copy of either side.',
     icon: Cpu,
     status: 'available',
     code: 'model → completion',
   },
   {
     title: 'Signed receipt',
-    body: 'A receipt is issued for the execution — a signed record you can keep alongside the response.',
+    body: 'The answer comes back with a receipt signed with ML-DSA-65 and Ed25519 over hashes of the prompt and the response.',
     icon: FileSignature,
     status: 'available',
-    code: 'receipt · signature',
+    code: 'qseal_receipt',
   },
   {
     title: 'Verification',
-    body: 'The receipt can be checked against QSeal’s published key. Verifier tooling ships with the API reference.',
+    body: 'Anyone holding the receipt can check it against QSeal’s published keys, in the app, through the API, or offline.',
     icon: ScanLine,
-    status: 'deployment',
-    code: 'verify(receipt) → ?',
+    status: 'available',
+    code: '/.well-known/qseal-keys.json',
   },
 ]
 
@@ -60,7 +60,7 @@ export function FlowSection() {
             lede="Four stages, one lifecycle. Each response can travel with a signed record of the execution that produced it."
           />
           <p className="max-w-[16rem] font-mono text-[11px] leading-relaxed text-steel-500">
-            Conceptual flow. Stage labels reflect what is confirmed for this frontend; see Security for detail.
+            Every stage runs in the app today. The Security page lists what each one does and does not guarantee.
           </p>
         </div>
 

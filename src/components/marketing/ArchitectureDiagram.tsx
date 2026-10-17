@@ -7,11 +7,11 @@ import { useReducedMotion } from '@/hooks/useMediaQuery'
  */
 const NODES = [
   { id: 'client', x: 40, y: 150, w: 170, label: 'Client / Agent', sub: 'App, SDK, autonomous agent' },
-  { id: 'api', x: 300, y: 150, w: 170, label: 'QSeal API', sub: '/v1 · OpenAI-compatible' },
-  { id: 'infer', x: 560, y: 70, w: 170, label: 'Inference', sub: 'Selected model' },
-  { id: 'receipt', x: 560, y: 230, w: 170, label: 'Receipt signer', sub: 'Signed record' },
+  { id: 'api', x: 300, y: 150, w: 170, label: 'QSeal gateway', sub: 'unseal · route · sign' },
+  { id: 'infer', x: 560, y: 70, w: 190, label: 'Model provider', sub: 'Groq, OpenRouter, …' },
+  { id: 'receipt', x: 560, y: 230, w: 190, label: 'Receipt', sub: 'ML-DSA-65 + Ed25519' },
   { id: 'verify', x: 820, y: 230, w: 150, label: 'Verifier', sub: 'Anyone, offline' },
-  { id: 'pay', x: 300, y: 330, w: 170, label: 'Solana', sub: 'Wallet auth · payments' },
+  { id: 'pay', x: 300, y: 330, w: 170, label: 'Solana', sub: 'x402 USDC payments' },
 ]
 
 const EDGES: Array<[string, string, string?]> = [
@@ -46,8 +46,9 @@ export function ArchitectureDiagram() {
         <svg viewBox="0 0 1010 420" className="min-w-[720px]" role="img" aria-labelledby="arch-title arch-desc">
           <title id="arch-title">QSeal architecture</title>
           <desc id="arch-desc">
-            A client sends requests to the QSeal API, which runs inference on the selected model and issues a signed receipt that a
-            verifier can check. Solana handles wallet authentication and payments separately.
+            A client sends a request, optionally sealed with ML-KEM-768, to the QSeal gateway. The gateway verifies payment on Solana,
+            unseals the request in memory, forwards it to the model provider, and returns the answer with a signed receipt that
+            anyone can verify.
           </desc>
           <defs>
             <linearGradient id="edge" x1="0" x2="1">
@@ -101,7 +102,7 @@ export function ArchitectureDiagram() {
         </svg>
       </div>
       <figcaption className="mt-4 font-mono text-[11px] text-steel-600">
-        Logical data flow. Dashed line: identity and payment rail, separate from inference cryptography.
+        Logical data flow. Dashed line: the payment rail, verified on-chain and separate from inference cryptography.
       </figcaption>
     </figure>
   )

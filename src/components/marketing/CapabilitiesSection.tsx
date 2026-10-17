@@ -70,6 +70,15 @@ function ModelsTile() {
   )
 }
 
+const RECEIPT_FIELDS: Array<[string, string]> = [
+  ['id', 'rcpt_6f8d…'],
+  ['model', 'qseal-quantum-70b'],
+  ['promptHash', 'sha256 · 79b3…'],
+  ['responseHash', 'sha256 · 1c8c…'],
+  ['tokens', '2 · 46 · 48'],
+  ['payment', 'prepaid-key · 0.001'],
+]
+
 function ReceiptTile() {
   return (
     <SpotlightCard className="flex h-full flex-col p-7 sm:p-9">
@@ -81,41 +90,40 @@ function ReceiptTile() {
           whileInView={{ y: 0, rotate: -2, opacity: 1 }}
           viewport={{ once: true, amount: 0.6 }}
           transition={{ duration: 1.2, ease: EASE }}
-          className="relative w-full max-w-[260px] rounded-t-xl border border-b-0 border-white/10 bg-[linear-gradient(180deg,#1c1c21,#121215)] px-6 pb-10 pt-6 shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]"
-          aria-hidden
+          className="relative w-full max-w-[280px] rounded-t-xl border border-b-0 border-white/10 bg-[linear-gradient(180deg,#1c1c21,#121215)] px-5 pb-9 pt-5 shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]"
         >
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-steel-400">Receipt</span>
-            <span className="h-1.5 w-10 rounded-full bg-white/10" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-steel-400">qseal_receipt</span>
+            <span className="font-mono text-[9.5px] text-steel-600">v2</span>
           </div>
-          <div className="mt-6 space-y-3">
-            {[82, 64, 74, 40, 58].map((w, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="h-1.5 w-8 rounded-full bg-white/[0.05]" />
-                <span className="h-1.5 rounded-full bg-white/[0.12]" style={{ width: `${w}%` }} />
+          <dl className="mt-4 space-y-1.5 font-mono text-[10.5px]">
+            {RECEIPT_FIELDS.map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-3">
+                <dt className="text-steel-500">{k}</dt>
+                <dd className="truncate text-steel-200">{v}</dd>
               </div>
             ))}
-          </div>
-          <div className="mt-7 border-t border-dashed border-white/10 pt-5">
-            <div className="font-mono text-[9px] leading-[1.6] tracking-[0.12em] text-steel-600 break-all">
-              ▚▞▙▟▛▜▚▞▙▟▛▜▚▞▙▟▛▜▚▞▙▟▛▜▚▞▙▟▛▜▚▞▙▟
-            </div>
+          </dl>
+          <div className="mt-4 border-t border-dashed border-white/10 pt-3 font-mono text-[10px] text-steel-500">
+            <p>mlDsaSignature · 3309 bytes</p>
+            <p>ed25519Signature · 64 bytes</p>
           </div>
           <motion.div
             initial={{ scale: 1.6, opacity: 0, rotate: -20 }}
             whileInView={{ scale: 1, opacity: 1, rotate: -8 }}
             viewport={{ once: true, amount: 0.8 }}
             transition={{ duration: 0.7, ease: EASE, delay: 0.6 }}
-            className="absolute -right-5 bottom-6 grid size-20 place-items-center rounded-full border border-white/20 bg-ink-900/90 shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur"
+            className="absolute -right-5 bottom-5 grid size-[72px] place-items-center rounded-full border border-white/20 bg-ink-900/90 shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur"
+            aria-hidden
           >
-            <QEmblem className="h-9 w-auto" detail="mark" />
+            <QEmblem className="h-8 w-auto" detail="mark" />
           </motion.div>
         </motion.div>
       </div>
       <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-5">
-        <span className="text-[13px] text-steel-500">Illustrative — format per API reference</span>
+        <span className="text-[13px] text-steel-500">Hashes only. Never your prompt.</span>
         <Link to="/app/verify" className="inline-flex items-center gap-1 text-[13px] text-steel-200 hover:text-white">
-          Verify <ArrowUpRight className="size-3.5" />
+          Verify one <ArrowUpRight className="size-3.5" />
         </Link>
       </div>
     </SpotlightCard>
@@ -124,8 +132,8 @@ function ReceiptTile() {
 
 function PaymentsTile() {
   const rails = [
-    { icon: Wallet, name: 'Solana wallet', body: 'Authenticate and pay from a wallet you control.' },
-    { icon: KeyRound, name: 'Prepaid key', body: 'Fund once, then call the API without signing per request.' },
+    { icon: Wallet, name: 'Pay per request', body: 'An x402 USDC transfer from your wallet, verified on-chain and usable once.' },
+    { icon: KeyRound, name: 'Prepaid key', body: 'Fund once with USDC, then call the API like any OpenAI key.' },
   ]
   return (
     <SpotlightCard className="h-full p-7 sm:p-9">
@@ -133,7 +141,7 @@ function PaymentsTile() {
         <p className="eyebrow">Payments & access</p>
         <AvailabilityTag value="available" />
       </div>
-      <h3 className="mt-4 max-w-md text-2xl font-medium tracking-[-0.03em] text-steel-50">Two ways in. No subscription required.</h3>
+      <h3 className="mt-4 max-w-md text-2xl font-medium tracking-[-0.03em] text-steel-50">USDC on Solana. No account, no subscription.</h3>
       <div className="mt-9 grid gap-3 sm:grid-cols-2">
         {rails.map((r) => (
           <div key={r.name} className="rounded-2xl border border-white/[0.07] bg-ink-950/40 p-5">
@@ -144,7 +152,7 @@ function PaymentsTile() {
         ))}
       </div>
       <p className="mt-5 text-[12.5px] leading-relaxed text-steel-600">
-        Wallet signatures secure payments. They are classical (Ed25519) and are not part of QSeal’s post-quantum design.
+        Failed requests are refunded automatically. Wallet signatures are classical (Ed25519) and sit outside QSeal’s post-quantum design.
       </p>
     </SpotlightCard>
   )
@@ -152,8 +160,10 @@ function PaymentsTile() {
 
 function EndpointsTile() {
   const endpoints = [
-    { m: 'GET', p: '/v1/models', d: 'List available models' },
     { m: 'POST', p: '/v1/chat/completions', d: 'Run an inference' },
+    { m: 'GET', p: '/v1/models', d: 'Models and prices' },
+    { m: 'POST', p: '/v1/receipts/verify', d: 'Check a receipt' },
+    { m: 'POST', p: '/mcp', d: 'MCP tools for agents' },
   ]
   return (
     <SpotlightCard className="h-full p-7 sm:p-9">
@@ -172,7 +182,7 @@ function EndpointsTile() {
         ))}
       </ul>
       <p className="mt-5 text-[12.5px] leading-relaxed text-steel-600">
-        Programmatic access suits autonomous agents: a prepaid key and a base URL is all an agent needs.
+        Point the OpenAI SDK at QSeal with a prepaid key, or plug the MCP endpoint into an agent framework.
       </p>
     </SpotlightCard>
   )

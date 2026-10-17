@@ -33,8 +33,8 @@ export function CodeWindow({ className }: { className?: string }) {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden rounded-full border border-warn/25 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-warn sm:inline">
-            Illustrative
+          <span className="hidden rounded-full border border-white/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-steel-400 sm:inline">
+            OpenAI-compatible
           </span>
           <CopyButton value={current.code} />
         </div>
@@ -56,8 +56,7 @@ export function CodeWindow({ className }: { className?: string }) {
       </div>
       <div className="flex items-center justify-between border-t border-white/[0.07] px-4 py-2.5 font-mono text-[10.5px] text-steel-600">
         <span>{current.file}</span>
-        <span className="sm:hidden text-warn/80">Illustrative</span>
-        <span className="hidden sm:inline">Not executed against a live service</span>
+        <span className="hidden sm:inline">Set QSEAL_API_URL and QSEAL_KEY, then run</span>
       </div>
     </div>
   )

@@ -7,10 +7,10 @@ import { SECURITY_LAYERS } from '@/content/security'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 const NOT_CLAIMED = [
-  'End-to-end encryption of prompts to the model',
+  'End-to-end encryption all the way to the model',
+  'That model providers never see or store prompts',
   'Hardware trusted execution or remote attestation',
-  'Zero-knowledge proofs of inference',
-  'Guaranteed secrecy of prompts from the operator',
+  'Zero-knowledge proofs of inference, or that answers are correct',
   'Post-quantum security for Solana wallet signatures',
 ]
 
@@ -25,7 +25,7 @@ export default function Security() {
             Precise claims. <span className="text-steel-500">Nothing implied.</span>
           </>
         }
-        lede="Security is a set of specific properties with specific boundaries. This page lists each layer of QSeal, what it protects, and what it does not."
+        lede="Security is a set of specific properties with specific boundaries. Here is each layer of QSeal, what it protects, and what it does not."
       />
 
       <Container className="py-20 md:py-28">
@@ -59,7 +59,7 @@ export default function Security() {
 
         <div className="mt-20">
           <Prose title="Explicitly not claimed">
-            <p>Unless a deployment documents otherwise, QSeal does not claim any of the following:</p>
+            <p>QSeal does not claim any of the following:</p>
             <ul className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
               {NOT_CLAIMED.map((c) => (
                 <li key={c} className="flex items-center gap-4 py-3.5 text-steel-300">
@@ -77,9 +77,9 @@ export default function Security() {
           </Prose>
           <Prose title="This web application">
             <p>
-              The app stores your request history only in this browser. An access key you enter is kept in session storage for the
-              current tab and is never logged. The app never displays a receipt as valid unless a configured verifier has actually
-              checked it.
+              The gateway keeps no prompts or completions, so your request history lives only in this browser. A prepaid key is kept
+              for the current tab unless you choose to remember it on your device, and it is only ever sent to the gateway. Receipts
+              are shown as valid only after their signatures have been checked in your browser against the gateway’s published keys.
             </p>
           </Prose>
           <Prose title="Reporting a vulnerability">
