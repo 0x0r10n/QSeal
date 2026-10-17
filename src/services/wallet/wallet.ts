@@ -356,13 +356,25 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
   // 1. Wallet Standard signAndSendTransaction
   const features = wallet.features as Features
   if (features?.[SIGN_AND_SEND]?.signAndSendTransaction) {
-    const [out] = await features[SIGN_AND_SEND].signAndSendTransaction({
-      account,
-      chain,
-      transaction: base64ToBytes(transactionBase64),
-      options: { commitment: 'confirmed' },
-    })
-    return toBase58(out.signature as Uint8Array)
+    try {
+      const [out] = await features[SIGN_AND_SEND].signAndSendTransaction({
+        account,
+        chain,
+        transaction: base64ToBytes(transactionBase64),
+      })
+      if (out?.signature) {
+        return typeof out.signature === 'string' ? out.signature : toBase58(out.signature as Uint8Array)
+      }
+    } catch (err: any) {
+      const msg = String(err?.message || err)
+      if (msg.includes('User rejected') || msg.includes('User cancelled')) {
+        throw err
+      }
+      console.warn('Wallet standard signAndSendTransaction failed, checking injected fallback:', err)
+      if (!wallet.name.toLowerCase().includes('phantom')) {
+        throw err
+      }
+    }
   }
 
   // 2. Injected Phantom fallback
@@ -370,7 +382,9 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
     const phantom = getPhantomProvider()
     if (phantom?.signAndSendTransaction) {
       const signed = await phantom.signAndSendTransaction(base64ToBytes(transactionBase64))
-      return signed.signature || toBase58(signed.signature)
+      return signed.signature
+        ? (typeof signed.signature === 'string' ? signed.signature : toBase58(signed.signature))
+        : toBase58(signed as any)
     }
   }
 
