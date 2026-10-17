@@ -22,7 +22,7 @@ export default function Models() {
       <PageHeader
         eyebrow="Catalogue"
         title="Models"
-        description={<>Served live from <code className="font-mono text-[13px] text-steel-300">GET /v1/models</code>. Nothing on this page is hard-coded.</>}
+        description={<>Live from <code className="font-mono text-[13px] text-steel-300">GET /v1/models</code>: what the gateway can serve right now, its price per request, and which provider runs it.</>}
         actions={
           backendMode !== 'unconfigured' && (
             <Button variant="secondary" size="sm" onClick={() => void q.refetch()} disabled={q.isFetching}>
@@ -81,12 +81,25 @@ export default function Models() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-mono text-[13px] text-steel-50" title={m.id}>{m.id}</p>
-                        <p className="mt-1 text-[12px] text-steel-500">
-                          {m.ownedBy ?? 'Owner not reported'}
-                          {m.created ? ` · ${new Date(m.created * 1000).toLocaleDateString()}` : ''}
-                        </p>
+                        {m.description && <p className="mt-1 text-[12.5px] leading-snug text-steel-400">{m.description}</p>}
                       </div>
                     </div>
+                    <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-white/[0.05] pt-3 text-[12px]">
+                      <dt className="text-steel-500">Price</dt>
+                      <dd className="text-right font-mono tabular-nums text-steel-100">{m.priceUsdc !== undefined ? `${m.priceUsdc} USDC` : '—'}</dd>
+                      <dt className="text-steel-500">Context</dt>
+                      <dd className="text-right font-mono tabular-nums text-steel-200">{m.contextWindow ? `${(m.contextWindow / 1024).toFixed(0)}k tokens` : '—'}</dd>
+                      <dt className="text-steel-500">Served by</dt>
+                      <dd className="truncate text-right font-mono text-steel-300" title={m.servedBy?.upstreamModel}>
+                        {m.servedBy?.provider === 'dev-engine' ? 'Dev engine (not a model)' : m.servedBy?.provider ?? m.ownedBy ?? '—'}
+                      </dd>
+                      {m.servedBy?.upstreamModel && m.servedBy.provider !== 'dev-engine' && (
+                        <>
+                          <dt className="text-steel-500">Upstream</dt>
+                          <dd className="truncate text-right font-mono text-steel-400" title={m.servedBy.upstreamModel}>{m.servedBy.upstreamModel}</dd>
+                        </>
+                      )}
+                    </dl>
                     <Link
                       to="/app/new"
                       className="mt-4 inline-flex items-center gap-1 text-[12.5px] text-steel-400 opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"

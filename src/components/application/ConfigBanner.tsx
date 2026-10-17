@@ -1,15 +1,28 @@
 import { Link } from 'react-router-dom'
 import { PlugZap, FlaskConical } from 'lucide-react'
 import { backendMode, env } from '@/lib/env'
+import { useHealth } from '@/hooks/useGateway'
 
-/** Persistent, non-dismissable note whenever the app is not talking to a real backend. */
+/** Persistent note whenever the app is not talking to a production backend. */
 export function ConfigBanner() {
-  if (backendMode === 'live') return null
+  const health = useHealth()
+  if (backendMode === 'live') {
+    if (health.data?.mode !== 'development') return null
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-warn/15 bg-warn/[0.05] px-4 py-2.5 text-[13px] text-warn sm:px-6">
+        <FlaskConical className="size-4 shrink-0" />
+        <span>
+          Development gateway: free test keys and simulated payments are enabled
+          {health.data.upstream.active ? '.' : ', and with no model provider set, responses come from a labelled echo engine.'}
+        </span>
+      </div>
+    )
+  }
   if (backendMode === 'mock') {
     return (
       <div className="flex items-center gap-3 border-b border-warn/15 bg-warn/[0.05] px-4 py-2.5 text-[13px] text-warn sm:px-6">
         <FlaskConical className="size-4 shrink-0" />
-        <span>Development sample data — no backend is connected. Nothing shown here is real.</span>
+        <span>Development sample data. No backend is connected. Nothing shown here is real.</span>
       </div>
     )
   }

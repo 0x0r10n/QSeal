@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { pqc, GatewayPublicKeys } from './pqc.js';
+import { pqc, type GatewayPublicKeys } from './pqc.js';
 import { getDb } from '../store/db.js';
 
 export interface QSealReceiptData {

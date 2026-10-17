@@ -74,55 +74,58 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Fixed-window rate limiting per client IP (set TRUST_PROXY behind a load balancer).
-const ipRateMap = new Map<string, { count: number; resetAt: number }>();
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, r] of ipRateMap) if (now > r.resetAt) ipRateMap.delete(ip);
-}, 60_000).unref();
-
-const rateLimit = (req: Request, res: Response, next: NextFunction) => {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const now = Date.now();
-  let record = ipRateMap.get(ip);
-  if (!record || now > record.resetAt) {
-    record = { count: 0, resetAt: now + config.rateLimitWindowMs };
-    ipRateMap.set(ip, record);
-  }
-  record.count++;
-  if (record.count > config.rateLimitMax) {
-    res.setHeader('Retry-After', Math.ceil((record.resetAt - now) / 1000));
-    return res.status(429).json({ error: { message: 'Rate limit exceeded. Please wait before sending more requests.', type: 'rate_limit_error' } });
-  }
-  next();
-};
+// Paid and compute-heavy calls get the strict limit; cheap reads a looser one.
+function makeLimiter(max: () => number) {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, r] of hits) if (now > r.resetAt) hits.delete(ip);
+  }, 60_000).unref();
+  return (req: Request, res: Response, next: NextFunction) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    let record = hits.get(ip);
+    if (!record || now > record.resetAt) {
+      record = { count: 0, resetAt: now + config.rateLimitWindowMs };
+      hits.set(ip, record);
+    }
+    record.count++;
+    if (record.count > max()) {
+      res.setHeader('Retry-After', Math.ceil((record.resetAt - now) / 1000));
+      return res.status(429).json({ error: { message: 'Rate limit exceeded. Please wait before sending more requests.', type: 'rate_limit_error' } });
+    }
+    next();
+  };
+}
+const strict = makeLimiter(() => config.rateLimitMax);
+const reads = makeLimiter(() => config.rateLimitMax * 10);
 
 const api = express.Router();
-api.use(rateLimit);
 
 // OpenAI-compatible
-api.post('/v1/chat/completions', handleChatCompletions);
-api.get('/v1/models', handleListModels);
+api.post('/v1/chat/completions', strict, handleChatCompletions);
+api.get('/v1/models', reads, handleListModels);
 
 // Receipts
-api.get('/v1/receipts/stats', handleReceiptStats);
-api.get('/v1/receipts/:id', handleGetReceipt);
-api.post('/v1/receipts/verify', handleVerifyReceipt);
+api.get('/v1/receipts/stats', reads, handleReceiptStats);
+api.get('/v1/receipts/:id', reads, handleGetReceipt);
+api.post('/v1/receipts/verify', reads, handleVerifyReceipt);
 
 // Prepaid keys and payments
-api.post('/v1/keys/prepaid', handleCreatePrepaidKey);
-api.post('/v1/keys/topup', handleTopUpKey);
-api.get('/v1/keys/balance', handleGetBalance);
-api.get('/v1/keys/:key/balance', handleGetKeyBalance);
-api.post('/v1/payments/prepare', handlePreparePayment);
+api.post('/v1/keys/prepaid', strict, handleCreatePrepaidKey);
+api.post('/v1/keys/topup', strict, handleTopUpKey);
+api.get('/v1/keys/balance', reads, handleGetBalance);
+api.get('/v1/keys/:key/balance', strict, handleGetKeyBalance);
+api.post('/v1/payments/prepare', strict, handlePreparePayment);
 
 // Public verification keys
-api.get('/v1/quantum-keys', handleGetQuantumKeys);
-api.get('/.well-known/qseal-keys.json', handleGetQuantumKeys);
+api.get('/v1/quantum-keys', reads, handleGetQuantumKeys);
+api.get('/.well-known/qseal-keys.json', reads, handleGetQuantumKeys);
 
 // MCP (JSON-RPC over HTTP)
-api.post('/mcp', handleMcpRequest);
+api.post('/mcp', strict, handleMcpRequest);
 
-api.get('/health', (_req: Request, res: Response) => {
+api.get('/health', reads, (_req: Request, res: Response) => {
   const keys = pqc.getPublicKeys();
   res.status(200).json({
     status: 'healthy',

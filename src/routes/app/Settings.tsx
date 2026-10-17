@@ -1,8 +1,10 @@
 import { useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
-import { RefreshCw, Wallet } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { PageHeader, Panel } from '@/components/application/ui'
 import { BackendStatusPill } from '@/components/application/BackendStatus'
+import { WalletMenu } from '@/components/application/WalletMenu'
+import { useHealth } from '@/hooks/useGateway'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { StatusTag } from '@/components/ui/StatusTag'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
@@ -53,6 +55,7 @@ export default function Settings() {
   const key = useAccessKey()
   const history = useHistory()
   const status = useBackendStatus()
+  const health = useHealth()
 
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -74,11 +77,28 @@ export default function Settings() {
                 {backendMode === 'live' ? 'Live' : backendMode === 'mock' ? 'Sample data' : 'Unconfigured'}
               </StatusTag>
             </Row>
+            {health.data && (
+              <>
+                <Row label="Solana network" hint={`USDC to ${health.data.solana.payTo.slice(0, 6)}…${health.data.solana.payTo.slice(-4)}`}>
+                  <StatusTag tone={health.data.solana.network === 'mainnet-beta' ? 'ok' : 'warn'}>
+                    {health.data.solana.network === 'mainnet-beta' ? 'Mainnet' : 'Devnet'}
+                  </StatusTag>
+                </Row>
+                <Row label="Model provider">
+                  <span className="font-mono text-[12.5px] text-steel-300">
+                    {health.data.upstream.active ? health.data.upstream.provider : health.data.upstream.provider === 'dev-engine' ? 'dev echo engine' : 'none'}
+                  </span>
+                </Row>
+                <Row label="Gateway mode" hint={health.data.mode === 'development' ? 'Free test keys and simulated payments are enabled.' : undefined}>
+                  <StatusTag tone={health.data.mode === 'production' ? 'ok' : 'warn'}>{health.data.mode}</StatusTag>
+                </Row>
+              </>
+            )}
             <Row label="Request timeout">
               <span className="font-mono text-[12.5px] text-steel-300">{Math.round(env.timeoutMs / 1000)} s</span>
             </Row>
             {backendMode === 'live' && (
-              <Row label="Connection test" hint={status.status === 'unreachable' ? describeError(status.error).detail : 'Calls GET /v1/models.'}>
+              <Row label="Connection test" hint={status.status === 'unreachable' ? describeError(status.error).detail : 'Calls GET /health.'}>
                 <Button variant="secondary" size="sm" onClick={status.refetch}>
                   <RefreshCw className="size-3.5" /> Test
                 </Button>
@@ -92,18 +112,18 @@ export default function Settings() {
             <Row label="Prepaid key" hint={key ? 'Stored for this tab only.' : 'No key in this session.'}>
               {key ? <span className="font-mono text-[12.5px] text-steel-200">{maskKey(key)}</span> : <ButtonLink to="/app/keys" size="sm" variant="secondary">Add key</ButtonLink>}
             </Row>
-            <Row label="Account profile" hint="Account management is not part of the connected API.">
-              <StatusTag tone="muted">Unavailable</StatusTag>
+            <Row label="Accounts" hint="QSeal has no username or password. Your wallet and prepaid keys are your identity.">
+              <StatusTag tone="neutral" dot={false}>Accountless</StatusTag>
             </Row>
           </Panel>
         </div>
 
         <div id="wallet" className="scroll-mt-20">
           <Panel title="Wallet">
-            <Row label="Solana wallet" hint="Wallet connection and payment are enabled once the deployment supplies its wallet, network and payment configuration.">
-              <Button variant="secondary" size="sm" disabled>
-                <Wallet className="size-3.5" /> Connect
-              </Button>
+            <Row label="Solana wallet" hint="Used to pay per request and to buy or top up prepaid keys. QSeal never holds your wallet keys.">
+              <div className="w-64">
+                <WalletMenu variant="block" />
+              </div>
             </Row>
           </Panel>
         </div>

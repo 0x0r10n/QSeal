@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from 'react'
 import { local, readJSON, writeJSON } from '@/lib/storage'
+import type { QSealReceipt } from '@/types/api'
 
 /**
- * Request history recorded by THIS browser. There is no confirmed history
- * endpoint on the backend, so this is an honest local log of requests the
- * user actually sent from here — never synthesised entries.
+ * Request history recorded by THIS browser. The gateway keeps no prompts or
+ * completions (zero retention), so this local log is the only copy: requests
+ * the user actually sent from here, with their signed receipts.
  */
 export type RequestStatus = 'pending' | 'completed' | 'failed' | 'cancelled'
 
@@ -21,7 +22,12 @@ export interface HistoryEntry {
   httpStatus?: number
   latencyMs?: number
   error?: { title: string; detail: string }
-  receipt?: unknown | null
+  receipt?: QSealReceipt | null
+  receiptCheck?: 'valid' | 'invalid' | 'unable'
+  sealed?: boolean
+  payment?: 'key' | 'wallet'
+  paymentSignature?: string
+  priceUsdc?: number
   sample?: boolean
 }
 

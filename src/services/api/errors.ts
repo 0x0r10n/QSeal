@@ -4,6 +4,7 @@ export type ApiErrorKind =
   | 'timeout'
   | 'aborted'
   | 'http'
+  | 'payment' // HTTP 402: the gateway wants payment (body carries the x402 challenge)
   | 'parse'
 
 export class ApiError extends Error {
@@ -35,7 +36,9 @@ export function describeError(err: unknown): { title: string; detail: string } {
       case 'aborted':
         return { title: 'Request cancelled', detail: 'The request was cancelled before it completed.' }
       case 'http':
-        return { title: `Server responded ${err.status}`, detail: err.message }
+        return { title: err.status && err.status >= 500 ? 'The gateway could not complete this' : `Request refused (${err.status})`, detail: err.message }
+      case 'payment':
+        return { title: 'Payment required', detail: err.message }
       case 'parse':
         return { title: 'Unexpected response', detail: err.message }
     }

@@ -92,25 +92,48 @@ export default function HistoryDetail() {
               <Row k="Sent" v={formatDateTime(entry.createdAt)} />
               <Row k="HTTP" v={entry.httpStatus ?? '—'} />
               <Row k="Latency" v={entry.latencyMs ? formatMs(entry.latencyMs) : '—'} />
+              <Row k="Paid with" v={entry.payment === 'wallet' ? 'Wallet' : entry.payment === 'key' ? 'Prepaid key' : '—'} />
+              <Row k="Sealed prompt" v={entry.sealed ? 'Yes' : 'No'} />
               {entry.responseId && <Row k="Response ID" v={<span className="break-all font-mono text-[11.5px]">{entry.responseId}</span>} />}
               {entry.sample && <Row k="Source" v={<StatusTag tone="warn">Sample data</StatusTag>} />}
             </dl>
           </Panel>
-          <Panel title="Receipt">
+          <Panel
+            title="Receipt"
+            actions={
+              entry.receiptCheck === 'valid' ? <StatusTag tone="ok">Verified</StatusTag>
+                : entry.receiptCheck === 'invalid' ? <StatusTag tone="bad">Failed</StatusTag>
+                  : undefined
+            }
+          >
             {entry.receipt ? (
               <>
-                <p className="text-[13px] text-steel-300">A receipt was captured with this response.</p>
-                <ButtonLink to="/app/verify" state={{ receipt: JSON.stringify(entry.receipt, null, 2) }} size="sm" className="mt-4">
-                  Verify receipt
-                </ButtonLink>
+                <dl className="space-y-3 text-[13px]">
+                  <Row k="ID" v={<span className="break-all font-mono text-[11.5px]">{entry.receipt.id}</span>} />
+                  <Row k="Tokens" v={entry.receipt.tokens.totalTokens} />
+                  <Row k="Paid" v={`${entry.receipt.payment.amountUsdc} USDC`} />
+                  <Row k="Method" v={entry.receipt.payment.type} />
+                  <Row k="Sealed" v={entry.receipt.sealed ? 'Yes' : 'No'} />
+                </dl>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ButtonLink to="/app/verify" state={{ receipt: JSON.stringify(entry.receipt, null, 2) }} size="sm">
+                    Verify receipt
+                  </ButtonLink>
+                  <CopyButton value={JSON.stringify(entry.receipt, null, 2)} label="Copy receipt" />
+                </div>
               </>
             ) : (
               <p className="text-[13px] leading-relaxed text-steel-500">
-                No receipt captured. The receipt format has not been configured in this frontend, so receipts are not extracted from
-                responses yet. The raw payload is kept for inspection.
+                {entry.status === 'completed' ? 'The response did not include a receipt.' : 'No receipt: the request did not complete.'}
               </p>
             )}
           </Panel>
+          {entry.paymentSignature && (
+            <Panel title="Payment">
+              <p className="text-[12.5px] text-steel-500">Solana transaction</p>
+              <p className="mt-1 break-all font-mono text-[11.5px] text-steel-300">{entry.paymentSignature}</p>
+            </Panel>
+          )}
         </aside>
       </div>
     </>

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { backendMode } from '@/lib/env'
 import { listModels } from '@/services/api/models'
+import { useHealth } from './useGateway'
 
 export function useModels() {
   return useQuery({
@@ -14,9 +15,9 @@ export function useModels() {
 
 export type BackendStatus = 'unconfigured' | 'checking' | 'online' | 'unreachable' | 'sample'
 
-/** Derived from the model catalogue call — the only read endpoint known to exist. */
+/** Derived from GET /health. */
 export function useBackendStatus(): { status: BackendStatus; error: unknown; refetch: () => void } {
-  const q = useModels()
+  const q = useHealth()
   const refetch = () => void q.refetch()
   if (backendMode === 'unconfigured') return { status: 'unconfigured', error: null, refetch }
   if (backendMode === 'mock') return { status: 'sample', error: null, refetch }

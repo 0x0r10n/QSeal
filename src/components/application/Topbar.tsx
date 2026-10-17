@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Menu, Plus, Wallet, X } from 'lucide-react'
+import { Menu, Plus, X } from 'lucide-react'
 import { BackendStatusPill } from './BackendStatus'
 import { SidebarContent } from './Sidebar'
 import { APP_NAV, APP_NAV_SECONDARY } from './nav'
 import { ButtonLink } from '@/components/ui/Button'
-import { useAccessKey } from '@/hooks/useAccessKey'
-import { maskKey } from '@/services/api/credentials'
+import { WalletMenu } from './WalletMenu'
 import { EASE } from '@/lib/motion'
 
 function useCurrentLabel() {
@@ -22,7 +21,6 @@ function useCurrentLabel() {
 export function Topbar() {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
-  const key = useAccessKey()
   const label = useCurrentLabel()
   useEffect(() => setOpen(false), [pathname])
 
@@ -45,14 +43,9 @@ export function Topbar() {
 
         <div className="ml-auto flex items-center gap-2">
           <BackendStatusPill className="hidden sm:inline-flex" />
-          <Link
-            to="/app/settings#wallet"
-            className="hidden h-8 items-center gap-2 rounded-full border border-white/10 px-3 text-xs text-steel-300 transition hover:border-white/20 hover:text-steel-50 md:inline-flex"
-            title="Wallet connection is not configured for this deployment"
-          >
-            <Wallet className="size-3.5" />
-            {key ? <span className="font-mono">{maskKey(key)}</span> : 'Wallet: not configured'}
-          </Link>
+          <div className="hidden md:block">
+            <WalletMenu />
+          </div>
           <ButtonLink to="/app/new" size="sm" className="h-8 px-3.5">
             <Plus className="size-3.5" /> <span className="hidden sm:inline">New request</span>
           </ButtonLink>
@@ -85,7 +78,8 @@ export function Topbar() {
                 <X className="size-4" />
               </button>
               <SidebarContent collapsed={false} onNavigate={() => setOpen(false)} />
-              <div className="absolute inset-x-4 bottom-6">
+              <div className="absolute inset-x-4 bottom-6 space-y-3">
+                <WalletMenu variant="block" align="left" />
                 <BackendStatusPill />
               </div>
             </motion.div>

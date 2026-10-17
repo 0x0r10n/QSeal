@@ -7,6 +7,9 @@ export interface RequestOptions {
   body?: unknown
   signal?: AbortSignal
   timeoutMs?: number
+  headers?: Record<string, string>
+  /** Send the session's prepaid key (default true). */
+  auth?: boolean
 }
 
 export interface ApiResponse<T> {
@@ -41,7 +44,8 @@ export async function request<T = unknown>(path: string, opts: RequestOptions = 
       headers: {
         Accept: 'application/json',
         ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-        ...authHeaders(),
+        ...(opts.auth === false ? {} : authHeaders()),
+        ...opts.headers,
       },
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,
@@ -71,7 +75,7 @@ export async function request<T = unknown>(path: string, opts: RequestOptions = 
 
   if (!res.ok) {
     const msg = extractMessage(data) ?? (res.statusText || 'Request failed')
-    throw new ApiError('http', msg, { status: res.status, body: data })
+    throw new ApiError(res.status === 402 ? 'payment' : 'http', msg, { status: res.status, body: data })
   }
   return { data: data as T, status: res.status, headers, latencyMs }
 }
@@ -82,7 +86,9 @@ function extractMessage(body: unknown): string | null {
     const err = b.error
     if (typeof err === 'string') return err
     if (err && typeof err === 'object' && typeof (err as Record<string, unknown>).message === 'string') {
-      return (err as Record<string, string>).message
+      const e = err as Record<string, string>
+      // x402 refusals carry the specific reason (insufficient balance, replay, …) separately.
+      return e.reason ? `${e.reason}` : e.message
     }
     if (typeof b.message === 'string') return b.message
     if (typeof b.detail === 'string') return b.detail

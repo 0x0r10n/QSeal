@@ -10,6 +10,8 @@ import { HistoryList } from '@/features/history/HistoryList'
 import { useHistory } from '@/features/history/store'
 import { useModels } from '@/hooks/useModels'
 import { useAccessKey } from '@/hooks/useAccessKey'
+import { useHealth, useKeyBalance } from '@/hooks/useGateway'
+import { shortAddress, useWallet } from '@/services/wallet/wallet'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { backendMode, env } from '@/lib/env'
 
@@ -23,6 +25,9 @@ export default function Dashboard() {
   const history = useHistory()
   const models = useModels()
   const key = useAccessKey()
+  const health = useHealth()
+  const balance = useKeyBalance()
+  const { account } = useWallet()
   const local = history.filter((e) => !e.sample || backendMode === 'mock')
   const completed = local.filter((e) => e.status === 'completed').length
   const failed = local.filter((e) => e.status === 'failed').length
@@ -75,18 +80,28 @@ export default function Dashboard() {
           <Panel title="Connection" actions={<BackendStatusPill />} className="h-full">
             <dl className="space-y-4 text-[13px]">
               <div>
-                <dt className="text-steel-500">Backend</dt>
+                <dt className="text-steel-500">Gateway</dt>
                 <dd className="mt-1 truncate font-mono text-[12px] text-steel-200">{env.apiUrl ?? 'Not configured'}</dd>
               </div>
-              <div>
-                <dt className="text-steel-500">Models available</dt>
-                <dd className="mt-1 text-steel-200">
-                  {backendMode === 'unconfigured' ? '—' : models.isPending ? <Skeleton className="h-4 w-10" /> : models.isError ? 'Unavailable' : models.data.length}
-                </dd>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-steel-500">Network</dt>
+                  <dd className="mt-1 text-steel-200">
+                    {health.data ? (health.data.solana.network === 'mainnet-beta' ? 'Solana mainnet' : 'Solana devnet') : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-steel-500">Models</dt>
+                  <dd className="mt-1 text-steel-200">
+                    {backendMode === 'unconfigured' ? '—' : models.isPending ? <Skeleton className="h-4 w-10" /> : models.isError ? 'Unavailable' : models.data.length}
+                  </dd>
+                </div>
               </div>
               <div>
-                <dt className="text-steel-500">Access</dt>
-                <dd className="mt-1 text-steel-200">{key ? 'Prepaid key (this session)' : 'No key set'}</dd>
+                <dt className="text-steel-500">Model provider</dt>
+                <dd className="mt-1 text-steel-200">
+                  {health.data ? (health.data.upstream.active ? health.data.upstream.provider : health.data.upstream.provider === 'dev-engine' ? 'Dev echo engine (not a model)' : 'None configured') : '—'}
+                </dd>
               </div>
             </dl>
           </Panel>
@@ -116,10 +131,26 @@ export default function Dashboard() {
         </Panel>
 
         <div className="grid gap-4">
-          <Panel title="Usage" actions={<span className="font-mono text-[10.5px] text-steel-600">This browser</span>}>
-            {local.length === 0 ? (
+          <Panel
+            title="Usage"
+            actions={<span className="font-mono text-[10.5px] text-steel-600">{balance.data ? 'Prepaid key' : 'This browser'}</span>}
+          >
+            {balance.data ? (
+              <dl className="grid grid-cols-3 gap-3">
+                {[
+                  ['Balance', `${balance.data.balance_usdc.toFixed(3)}`],
+                  ['Spent', `${balance.data.total_spent_usdc.toFixed(3)}`],
+                  ['Requests', balance.data.total_requests.toLocaleString()],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="text-[11.5px] text-steel-500">{k}{k !== 'Requests' && ' (USDC)'}</dt>
+                    <dd className="mt-1 text-xl font-medium tabular-nums tracking-tight text-steel-50">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : local.length === 0 ? (
               <p className="text-[13px] leading-relaxed text-steel-500">
-                Account-level usage is not available from the configured API. Local counts appear once you send requests.
+                Add a prepaid key to see its balance and spend. Requests you send from this browser are counted here too.
               </p>
             ) : (
               <dl className="grid grid-cols-3 gap-3">
@@ -142,12 +173,18 @@ export default function Dashboard() {
               <li className="flex items-center gap-3">
                 <Wallet className="size-4 text-steel-500" />
                 <span className="flex-1 text-steel-300">Solana wallet</span>
-                <StatusTag tone="muted">Not configured</StatusTag>
+                {account ? <StatusTag tone="ok">{shortAddress(account.address)}</StatusTag> : <StatusTag tone="muted">Not connected</StatusTag>}
               </li>
               <li className="flex items-center gap-3">
                 <KeyRound className="size-4 text-steel-500" />
                 <span className="flex-1 text-steel-300">Prepaid key</span>
-                {key ? <StatusTag tone="ok">Session</StatusTag> : <StatusTag tone="muted">None</StatusTag>}
+                {key ? (
+                  <StatusTag tone={balance.data && balance.data.balance_usdc < 0.01 ? 'warn' : 'ok'}>
+                    {balance.data ? `${balance.data.balance_usdc.toFixed(2)} USDC` : 'Active'}
+                  </StatusTag>
+                ) : (
+                  <Link to="/app/keys" className="text-[12.5px] text-steel-300 underline underline-offset-2 hover:text-white">Buy a key</Link>
+                )}
               </li>
             </ul>
           </Panel>

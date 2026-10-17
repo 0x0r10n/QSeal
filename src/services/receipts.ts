@@ -1,62 +1,116 @@
 /**
- * Receipt extraction and verification boundary.
+ * Receipt extraction and verification.
  *
- * QSeal issues signed receipts for inference, but the receipt wire format and
- * verification procedure have not been supplied to this frontend. Until they
- * are, these functions deliberately return "not configured" results. They
- * must NEVER report a receipt as valid without performing real verification.
+ * "Valid" is only ever reported after the ML-DSA-65 and Ed25519 signatures
+ * have been checked in this browser against the keys the gateway publishes
+ * at /.well-known/qseal-keys.json. The gateway's own verdict is shown
+ * alongside as a second opinion, never instead of the local check.
  */
+import { backendMode } from '@/lib/env'
+import type { QSealReceipt } from '@/types/api'
+import { fetchReceipt, getGatewayKeys, verifyOnGateway } from './api/gateway'
+import { describeError } from './api/errors'
 
 export type VerificationOutcome =
-  | { status: 'valid'; summary: string; details: Array<[string, string]> }
-  | { status: 'invalid'; summary: string; details: Array<[string, string]> }
+  | { status: 'valid'; summary: string; details: Array<[string, string]>; receipt: QSealReceipt }
+  | { status: 'invalid'; summary: string; reason: string; details: Array<[string, string]>; receipt?: QSealReceipt }
   | { status: 'unable'; summary: string; reason: string }
   | { status: 'unsupported'; summary: string; reason: string }
 
-export interface ReceiptVerifier {
-  name: string
-  /** Return null when the input is not in this verifier's format. */
-  verify(input: unknown): Promise<VerificationOutcome | null>
+export const verificationConfigured = () => backendMode === 'live'
+
+const RECEIPT_ID = /^rcpt_[a-f0-9]{32}$/
+
+function short(hex: string) {
+  return hex.length > 20 ? `${hex.slice(0, 10)}…${hex.slice(-8)}` : hex
 }
-
-/** Register real verifiers here once the format is known. */
-const verifiers: ReceiptVerifier[] = []
-
-export const verificationConfigured = () => verifiers.length > 0
 
 export async function verifyReceipt(text: string): Promise<VerificationOutcome> {
   const trimmed = text.trim()
-  if (!trimmed) return { status: 'unsupported', summary: 'Nothing to verify', reason: 'Paste or drop a receipt first.' }
+  if (!trimmed) return { status: 'unsupported', summary: 'Nothing to verify', reason: 'Paste a receipt or a receipt ID first.' }
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(trimmed)
-  } catch {
-    return {
-      status: 'unsupported',
-      summary: 'Unsupported format',
-      reason: 'The input is not valid JSON. Receipts are expected as JSON documents.',
+  const { isReceiptShape, verifyLocally } = await import('./crypto/verifyReceipt')
+
+  // Accept either a full receipt JSON or a receipt ID the gateway stores.
+  let candidate: unknown
+  if (RECEIPT_ID.test(trimmed)) {
+    if (!verificationConfigured()) return { status: 'unable', summary: 'Unable to verify', reason: 'Looking up a receipt ID needs a connected gateway.' }
+    try {
+      candidate = await fetchReceipt(trimmed)
+    } catch (e) {
+      const { title, detail } = describeError(e)
+      return { status: 'unable', summary: 'Unable to verify', reason: `${title}. ${detail}` }
+    }
+  } else {
+    try {
+      candidate = JSON.parse(trimmed)
+    } catch {
+      return { status: 'unsupported', summary: 'Unsupported format', reason: 'Expected a receipt as JSON, or a receipt ID (rcpt_…).' }
+    }
+    // Accept a whole completion response too.
+    if (candidate && typeof candidate === 'object' && 'qseal_receipt' in candidate) {
+      candidate = (candidate as { qseal_receipt: unknown }).qseal_receipt
     }
   }
-  if (!parsed || typeof parsed !== 'object') {
-    return { status: 'unsupported', summary: 'Unsupported format', reason: 'Expected a JSON object.' }
+
+  if (!isReceiptShape(candidate)) {
+    return { status: 'unsupported', summary: 'Unsupported format', reason: 'This JSON is not a QSeal receipt (missing id, version, payment or pqc signatures).' }
+  }
+  const receipt = candidate
+
+  if (!verificationConfigured()) {
+    return { status: 'unable', summary: 'Unable to verify', reason: 'Verification needs the gateway’s published keys, and no gateway is connected.' }
   }
 
-  for (const v of verifiers) {
-    const out = await v.verify(parsed)
-    if (out) return out
+  let keys
+  try {
+    keys = await getGatewayKeys()
+  } catch (e) {
+    const { title, detail } = describeError(e)
+    return { status: 'unable', summary: 'Unable to verify', reason: `Could not fetch the gateway’s published keys. ${title}. ${detail}` }
   }
 
+  const local = verifyLocally(receipt, keys)
+  let gatewayVerdict = 'Not available'
+  try {
+    const g = await verifyOnGateway({ receipt })
+    gatewayVerdict = g.verification.valid ? 'Valid' : `Invalid: ${g.verification.reason}`
+  } catch {
+    /* the local check is authoritative; the gateway check is a second opinion */
+  }
+
+  const details: Array<[string, string]> = [
+    ['Receipt', receipt.id],
+    ['Issued', new Date(receipt.timestamp).toLocaleString()],
+    ['Model', receipt.model],
+    ['Tokens', String(receipt.tokens.totalTokens)],
+    ['Payment', `${receipt.payment.type} · ${receipt.payment.amountUsdc} USDC`],
+    ['Sealed prompt', receipt.sealed ? 'Yes' : 'No'],
+    ['ML-DSA-65 (FIPS 204)', local.mlDsaValid ? 'Signature valid' : 'Signature invalid'],
+    ['Ed25519', local.ed25519Valid ? 'Signature valid' : 'Signature invalid'],
+    ['Signing key', local.signerMatchesGateway ? `Gateway key ${short(keys.mlDsaPublicKey)}` : 'Not the gateway’s published key'],
+    ['Gateway check', gatewayVerdict],
+  ]
+
+  if (local.valid) {
+    return { status: 'valid', summary: 'Valid', details, receipt }
+  }
   return {
-    status: 'unable',
-    summary: 'Unable to verify',
-    reason: verificationConfigured()
-      ? 'No configured verifier recognised this receipt.'
-      : 'No verification mechanism is configured in this deployment. The document was parsed but its signature was not checked.',
+    status: 'invalid',
+    summary: 'Invalid',
+    reason: !local.signerMatchesGateway
+      ? 'This receipt was not signed with the connected gateway’s published keys.'
+      : 'The signatures do not match the receipt’s contents. It was altered or is not genuine.',
+    details,
+    receipt,
   }
 }
 
-/** Pull a receipt out of a completion response, once the format is known. */
-export function extractReceipt(_raw: unknown, _headers: Record<string, string>): unknown | null {
+/** Pull the receipt out of a completion response. */
+export function extractReceipt(raw: unknown): QSealReceipt | null {
+  if (raw && typeof raw === 'object' && 'qseal_receipt' in raw) {
+    const r = (raw as { qseal_receipt: unknown }).qseal_receipt
+    if (r && typeof r === 'object' && 'pqc' in r) return r as QSealReceipt
+  }
   return null
 }

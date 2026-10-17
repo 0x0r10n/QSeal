@@ -34,7 +34,7 @@ export function ConfirmButton({
       }}
       onBlur={() => setArmed(false)}
     >
-      <span aria-live="polite">{armed ? confirmLabel : children}</span>
+      <span aria-live="polite" className="inline-flex items-center gap-2">{armed ? confirmLabel : children}</span>
     </Button>
   )
 }

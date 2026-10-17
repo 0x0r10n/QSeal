@@ -5,17 +5,23 @@ import { QEmblem } from '@/components/brand/QEmblem'
 import { formatMs } from '@/lib/format'
 import { EASE } from '@/lib/motion'
 import { cn } from '@/lib/cn'
+import type { PayStage } from '@/services/wallet/pay'
 
-export type Phase = 'idle' | 'sending' | 'done' | 'error' | 'cancelled'
+export type Phase = 'idle' | 'paying' | 'sending' | 'done' | 'error' | 'cancelled'
 
 export interface ChamberState {
   phase: Phase
   ready: boolean
+  paymentMethod: 'key' | 'wallet' | null
+  payStage?: PayStage
+  /** Phase in which an error happened. */
+  failedAt?: 'payment' | 'request'
+  sealed: boolean
   startedAt?: number
   latencyMs?: number
   httpStatus?: number
   errorTitle?: string
-  receiptFound?: boolean | null
+  receipt?: { id: string; check: 'checking' | 'valid' | 'invalid' | 'unable' } | null
 }
 
 type StepState = 'todo' | 'active' | 'done' | 'failed' | 'skipped'
@@ -29,50 +35,79 @@ function Elapsed({ since }: { since: number }) {
   return <>{formatMs(now - since)}</>
 }
 
-/**
- * Shows only lifecycle stages the client can actually observe. It never
- * animates signing or verification as if they happened.
- */
+const PAY_LABEL: Record<PayStage, string> = {
+  preparing: 'Gateway is preparing the USDC transfer',
+  signing: 'Approve the transfer in your wallet',
+  confirming: 'Waiting for Solana confirmation',
+}
+
+/** Shows only lifecycle stages this browser actually observed. */
 export function SealingChamber({ s }: { s: ChamberState }) {
+  const started = s.phase !== 'idle'
+  const reqDone = s.phase === 'done'
+  const paymentState: StepState =
+    !started ? 'todo'
+      : s.phase === 'paying' ? 'active'
+        : s.failedAt === 'payment' ? 'failed'
+          : s.phase === 'cancelled' && !s.startedAt ? 'skipped'
+            : 'done'
+
   const steps: Array<{ label: string; state: StepState; detail?: React.ReactNode }> = [
     {
       label: 'Composed',
-      state: s.ready || s.phase !== 'idle' ? 'done' : 'active',
-      detail: s.ready || s.phase !== 'idle' ? 'Model and prompt set' : 'Choose a model and write a prompt',
+      state: s.ready || started ? 'done' : 'active',
+      detail: s.ready || started ? 'Model and prompt set' : 'Choose a model and write a prompt',
     },
     {
-      label: 'Dispatched',
-      state: s.phase === 'idle' ? 'todo' : 'done',
-      detail: s.phase !== 'idle' ? 'POST /v1/chat/completions' : undefined,
-    },
-    {
-      label: 'Awaiting response',
-      state:
-        s.phase === 'sending' ? 'active' : s.phase === 'done' ? 'done' : s.phase === 'error' ? 'failed' : s.phase === 'cancelled' ? 'skipped' : 'todo',
+      label: 'Payment',
+      state: paymentState,
       detail:
-        s.phase === 'sending' && s.startedAt ? (
-          <Elapsed since={s.startedAt} />
-        ) : s.phase === 'error' ? (
-          s.errorTitle
-        ) : s.phase === 'cancelled' ? (
-          'Cancelled'
-        ) : s.latencyMs ? (
-          `HTTP ${s.httpStatus} · ${formatMs(s.latencyMs)}`
-        ) : undefined,
+        s.phase === 'paying' && s.payStage ? PAY_LABEL[s.payStage]
+          : s.failedAt === 'payment' ? s.errorTitle
+            : started && s.paymentMethod === 'key' ? 'Charged to your prepaid key by the gateway'
+              : started && s.paymentMethod === 'wallet' ? 'USDC transfer signed from your wallet'
+                : s.paymentMethod === 'key' ? 'Prepaid key'
+                  : s.paymentMethod === 'wallet' ? 'Wallet, pay per request'
+                    : 'Choose how to pay',
+    },
+    {
+      label: s.sealed ? 'Sealed and dispatched' : 'Dispatched',
+      state: !s.startedAt ? 'todo' : 'done',
+      detail: s.startedAt ? (s.sealed ? 'ML-KEM-768 + AES-256-GCM to the gateway' : 'POST /v1/chat/completions') : undefined,
+    },
+    {
+      label: 'Response',
+      state:
+        s.phase === 'sending' ? 'active'
+          : reqDone ? 'done'
+            : s.failedAt === 'request' ? 'failed'
+              : s.phase === 'cancelled' && s.startedAt ? 'skipped'
+                : 'todo',
+      detail:
+        s.phase === 'sending' && s.startedAt ? <Elapsed since={s.startedAt} />
+          : s.failedAt === 'request' ? s.errorTitle
+            : s.phase === 'cancelled' && s.startedAt ? 'Cancelled'
+              : s.latencyMs ? `HTTP ${s.httpStatus} · ${formatMs(s.latencyMs)}`
+                : undefined,
     },
     {
       label: 'Receipt',
-      state: s.phase !== 'done' ? 'todo' : s.receiptFound ? 'done' : 'skipped',
-      detail:
-        s.phase !== 'done'
-          ? undefined
-          : s.receiptFound
-            ? 'Receipt captured — verify it separately'
-            : 'Receipt format not configured; raw response kept',
+      state: !reqDone ? 'todo'
+        : !s.receipt ? 'skipped'
+          : s.receipt.check === 'checking' ? 'active'
+            : s.receipt.check === 'valid' ? 'done'
+              : s.receipt.check === 'invalid' ? 'failed'
+                : 'skipped',
+      detail: !reqDone ? undefined
+        : !s.receipt ? 'No receipt in the response'
+          : s.receipt.check === 'checking' ? 'Verifying ML-DSA-65 + Ed25519 in this browser'
+            : s.receipt.check === 'valid' ? `Verified in this browser · ${s.receipt.id.slice(0, 14)}…`
+              : s.receipt.check === 'invalid' ? 'Signature check failed'
+                : 'Captured; could not be checked now',
     },
   ]
 
-  const busy = s.phase === 'sending'
+  const busy = s.phase === 'paying' || s.phase === 'sending'
 
   return (
     <section aria-label="Request lifecycle" className="surface-raised relative overflow-hidden rounded-2xl">
@@ -93,9 +128,9 @@ export function SealingChamber({ s }: { s: ChamberState }) {
             style={{ top: 0 }}
           />
         )}
-        <p className="absolute left-4 top-3 eyebrow !text-[10px]">Sealing chamber</p>
+        <p className="eyebrow absolute left-4 top-3 !text-[10px]">Sealing chamber</p>
         <p className="absolute right-4 top-3 font-mono text-[10px] uppercase tracking-[0.12em] text-steel-500" aria-live="polite">
-          {s.phase === 'idle' ? 'Idle' : s.phase === 'sending' ? 'In flight' : s.phase === 'done' ? 'Complete' : s.phase === 'error' ? 'Failed' : 'Cancelled'}
+          {{ idle: 'Idle', paying: 'Paying', sending: 'In flight', done: 'Complete', error: 'Failed', cancelled: 'Cancelled' }[s.phase]}
         </p>
       </div>
       <ol className="p-5">
@@ -107,13 +142,13 @@ export function SealingChamber({ s }: { s: ChamberState }) {
             <StepIcon state={st.state} />
             <div className="min-w-0">
               <p className={cn('text-[13.5px]', st.state === 'todo' ? 'text-steel-500' : 'text-steel-100')}>{st.label}</p>
-              {st.detail && <p className="mt-0.5 truncate font-mono text-[11.5px] text-steel-500">{st.detail}</p>}
+              {st.detail && <p className="mt-0.5 font-mono text-[11.5px] leading-snug text-steel-500">{st.detail}</p>}
             </div>
           </li>
         ))}
       </ol>
       <p className="border-t border-white/[0.06] px-5 py-3 text-[11.5px] leading-relaxed text-steel-600">
-        Stages reflect what this client observed. Cryptographic checks happen only in Verify Receipt.
+        Stages reflect what this browser observed. Receipts are checked against the gateway’s published keys.
       </p>
     </section>
   )
@@ -131,6 +166,6 @@ function StepIcon({ state }: { state: StepState }) {
     case 'skipped':
       return <span className={cn(base, 'border-white/15 bg-ink-850 text-steel-500')}><Minus className="size-3" /></span>
     default:
-      return <span className={cn(base, 'border-white/10 bg-ink-850 text-steel-600')}><Circle className="size-1.5 fill-current text-steel-600" /></span>
+      return <span className={cn(base, 'border-white/10 bg-ink-850')}><Circle className="size-1.5 fill-current text-steel-600" /></span>
   }
 }

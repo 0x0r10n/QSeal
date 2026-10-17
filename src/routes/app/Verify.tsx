@@ -51,8 +51,8 @@ export default function Verify() {
       <PageHeader
         eyebrow="Verification"
         title="Verify a receipt"
-        description="Paste or drop a receipt to check its signature. A result is shown as valid only after a configured verifier has actually checked it."
-        actions={verificationConfigured() ? <StatusTag tone="ok">Verifier configured</StatusTag> : <StatusTag tone="warn">No verifier configured</StatusTag>}
+        description="Paste a receipt, a full API response, or a receipt ID. Its ML-DSA-65 and Ed25519 signatures are checked in your browser against the gateway’s published keys."
+        actions={verificationConfigured() ? <StatusTag tone="ok">Gateway keys available</StatusTag> : <StatusTag tone="warn">No gateway connected</StatusTag>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -70,7 +70,7 @@ export default function Verify() {
             }}
             className={cn('relative transition', drag && 'bg-white/[0.03]')}
           >
-            <label htmlFor="receipt" className="sr-only">Receipt JSON</label>
+            <label htmlFor="receipt" className="sr-only">Receipt JSON or receipt ID</label>
             <textarea
               id="receipt"
               value={text}
@@ -80,7 +80,7 @@ export default function Verify() {
               }}
               rows={16}
               spellCheck={false}
-              placeholder={'Paste receipt JSON here, or drop a .json file'}
+              placeholder={'Paste receipt JSON or a receipt ID (rcpt_…), or drop a .json file'}
               className={cn(fieldClass, 'block min-h-[360px] resize-y rounded-none border-0 bg-transparent px-5 py-5 font-mono text-[12.5px] leading-relaxed')}
             />
             {drag && (
@@ -125,7 +125,7 @@ export default function Verify() {
                       <O.icon className={cn('size-7', O.text)} strokeWidth={1.5} />
                       <p className={cn('mt-4 text-lg font-medium', O.text)}>{O.label}</p>
                       <p className="mt-1.5 text-[13.5px] leading-relaxed text-steel-300">
-                        {'reason' in outcome ? outcome.reason : outcome.summary}
+                        {'reason' in outcome ? outcome.reason : 'Signed by this gateway and unaltered since it was issued.'}
                       </p>
                       {'details' in outcome && (
                         <dl className="mt-5 space-y-2 border-t border-white/10 pt-4 text-[12.5px]">
@@ -153,10 +153,10 @@ export default function Verify() {
                           <div>
                             <p className="text-[13.5px] text-steel-100">{O.label}</p>
                             <p className="text-[12.5px] leading-relaxed text-steel-500">
-                              {k === 'valid' && 'Signature checked and matches the expected key.'}
-                              {k === 'invalid' && 'Signature checked and does not match, or the content was altered.'}
-                              {k === 'unable' && 'Parsed, but no verifier could check it in this deployment.'}
-                              {k === 'unsupported' && 'Not a receipt format this app can read.'}
+                              {k === 'valid' && 'Both signatures check out against the gateway’s published keys.'}
+                              {k === 'invalid' && 'A signature fails, the content was altered, or it was signed with other keys.'}
+                              {k === 'unable' && 'The gateway’s keys could not be fetched, so nothing was checked.'}
+                              {k === 'unsupported' && 'Not a QSeal receipt or receipt ID.'}
                             </p>
                           </div>
                         </li>
@@ -168,7 +168,7 @@ export default function Verify() {
             )}
           </AnimatePresence>
           <p className="px-1 text-[12px] leading-relaxed text-steel-600">
-            Verification runs locally in your browser through a pluggable verifier. Receipts are not uploaded anywhere by this page.
+            Signatures are checked in this browser. The receipt is also sent to the gateway for its own check as a second opinion. Receipts hold hashes and payment details, never your prompt or the response.
           </p>
         </div>
       </div>

@@ -30,5 +30,5 @@ export async function mockChat(req: ChatCompletionRequest, signal?: AbortSignal)
     model: req.model,
     choices: [{ message: { role: 'assistant', content: 'This is sample output generated locally for UI development.' } }],
   }
-  return { text: raw.choices[0].message.content, model: req.model, status: 200, headers: {}, raw, latencyMs: 1400 }
+  return { text: raw.choices[0].message.content, model: req.model, status: 200, headers: {}, raw, receipt: null, sealed: false, latencyMs: 1400 }
 }
