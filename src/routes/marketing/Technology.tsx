@@ -16,14 +16,14 @@ const STANDARDS = [
 ]
 
 const ENDPOINTS: Array<[string, string, string]> = [
-  ['POST', '/v1/chat/completions', 'Run an inference (OpenAI format, plus qseal_receipt)'],
+  ['POST', '/v1/chat/completions', 'Run an inference (OpenAI format, plus qrouter_receipt)'],
   ['GET', '/v1/models', 'Models, price per request, serving provider'],
   ['POST', '/v1/receipts/verify', 'Verify a receipt or receipt ID'],
-  ['GET', '/.well-known/qseal-keys.json', 'Published ML-KEM and verification keys'],
+  ['GET', '/.well-known/qrouter-keys.json', 'Published ML-KEM and verification keys'],
   ['POST', '/v1/keys/prepaid', 'Buy a prepaid key with a USDC deposit'],
   ['GET', '/v1/keys/balance', 'Prepaid key balance and usage'],
   ['POST', '/v1/payments/prepare', 'Build a USDC transfer for a wallet'],
-  ['POST', '/mcp', 'MCP tools: qseal_infer, qseal_verify_receipt'],
+  ['POST', '/mcp', 'MCP tools: qrouter_infer, qrouter_verify_receipt'],
 ]
 
 export default function Technology() {
@@ -55,7 +55,7 @@ export default function Technology() {
           <Prose title="API surface" aside={<AvailabilityTag value="available" />}>
             <p>
               QRouter speaks the OpenAI chat-completions format, so existing SDKs and agent frameworks work by changing the base URL and
-              using a prepaid key as the API key. Responses carry one extra field, <code className="text-steel-200">qseal_receipt</code>.
+              using a prepaid key as the API key. Responses carry one extra field, <code className="text-steel-200">qrouter_receipt</code>.
             </p>
             <ul className="divide-y divide-white/[0.06] rounded-2xl border border-white/[0.07]">
               {ENDPOINTS.map(([m, path, d]) => (
@@ -81,7 +81,7 @@ export default function Technology() {
             <p>
               A receipt binds the request and response hashes (SHA-256), the model, token counts, the payment and a timestamp. The
               gateway signs a canonical encoding of those fields twice, with ML-DSA-65 and with Ed25519, and publishes both public keys
-              at <code className="text-steel-200">/.well-known/qseal-keys.json</code>.
+              at <code className="text-steel-200">/.well-known/qrouter-keys.json</code>.
             </p>
             <p>
               Verification checks both signatures and that they were made with the gateway’s published keys, so a receipt someone

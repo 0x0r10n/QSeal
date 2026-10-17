@@ -1,4 +1,4 @@
-# QSeal Gateway 🔒⚛️
+# QRouter Gateway 🔒⚛️
 
 > **Quantum-secure private AI inference for Solana agents.**  
 > *“Private AI for Solana agents. Prompts stay sealed. Quantum-resistant. Pay with USDC.”*
@@ -7,14 +7,14 @@
 
 ## What it does
 
-- **OpenAI-compatible**: `POST /v1/chat/completions`, `GET /v1/models`. Responses add a `qseal_receipt` field.
+- **OpenAI-compatible**: `POST /v1/chat/completions`, `GET /v1/models`. Responses add a `qrouter_receipt` field.
 - **x402 V2 payments on Solana**: unpaid requests get `402` with a `PAYMENT-REQUIRED` challenge (CAIP-2 network, USDC mint, treasury, reference). Payments are verified on-chain, must be recent (`MAX_PAYMENT_AGE_SEC`), and can be used once, even across restarts.
 - **Prepaid keys**: bought with a verified USDC deposit (`POST /v1/keys/prepaid`), topped up the same way, stored only as SHA-256 hashes. Balance via `GET /v1/keys/balance` with `Authorization: Bearer`.
 - **Sealed prompts**: clients may encrypt requests to the gateway with ML-KEM-768 (FIPS 203) + AES-256-GCM. The gateway decrypts in memory and forwards the prompt to the model provider.
-- **Signed receipts**: ML-DSA-65 (FIPS 204) + Ed25519 over hashes of prompt and response, model, tokens and payment. Verification checks the signatures against the gateway's published keys (`/.well-known/qseal-keys.json`).
+- **Signed receipts**: ML-DSA-65 (FIPS 204) + Ed25519 over hashes of prompt and response, model, tokens and payment. Verification checks the signatures against the gateway's published keys (`/.well-known/qrouter-keys.json`).
 - **Zero prompt retention at the gateway**: no prompt or completion is stored or logged. Model providers handle prompts under their own policies.
-- **Model routing**: each QSeal model maps to a named upstream model per provider (`src/catalogue.ts`); `GET /v1/models` shows which. Provider failures are errors, never canned answers, and the charge is refunded.
-- **MCP**: `POST /mcp` with `qseal_infer` (paid like chat) and `qseal_verify_receipt`.
+- **Model routing**: each QRouter model maps to a named upstream model per provider (`src/catalogue.ts`); `GET /v1/models` shows which. Provider failures are errors, never canned answers, and the charge is refunded.
+- **MCP**: `POST /mcp` with `qrouter_infer` (paid like chat) and `qrouter_verify_receipt`.
 - **Persistence**: SQLite via Node's built-in `node:sqlite` (Node 22.13+). No native dependencies.
 
 ## 🚀 Quick Setup & Launch
@@ -69,7 +69,7 @@ Three ways, all tested:
 
 1. **Prepaid key** (simplest for agents): use it as the API key with any OpenAI SDK.
    ```ts
-   const qseal = new OpenAI({ baseURL: `${QSEAL_API_URL}/v1`, apiKey: "qseal_sk_…" })
+   const qrouter = new OpenAI({ baseURL: `${QROUTER_API_URL}/v1`, apiKey: "qrouter_sk_…" })
    ```
 2. **Pay per request**: send a USDC transfer to the treasury, then retry with its transaction signature (below).
 3. **Browser wallets**: `POST /v1/payments/prepare` returns an unsigned USDC transfer for the wallet to sign and send; the web app does this.
@@ -80,9 +80,9 @@ Three ways, all tested:
 
 ### Step 1: Unpaid Request
 ```bash
-curl -i -X POST http://localhost:4020/v1/chat/completions \
+curl -i -X POST https://api.qrouter.cloud/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"Hello QSeal"}]}'
+  -d '{"messages":[{"role":"user","content":"Hello QRouter"}]}'
 ```
 
 **Response (HTTP 402 Payment Required):**
@@ -95,22 +95,22 @@ X-402-Pay-Url: solana:QSeaL...?amount=0.0010&spl-token=...&reference=6VD3...
 
 ### Step 2: Pay & Retry with PAYMENT-SIGNATURE
 ```bash
-curl -X POST http://localhost:4020/v1/chat/completions \
+curl -X POST https://api.qrouter.cloud/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "PAYMENT-SIGNATURE: <tx signature, or base64 JSON {\"signature\": ..., \"reference\": ...}>" \
-  -d '{"messages":[{"role":"user","content":"Hello QSeal"}]}'
+  -d '{"messages":[{"role":"user","content":"Hello QRouter"}]}'
 ```
 
 ---
 
 ## 🔑 Stable Receipt Verification Key
 
-QSeal generates and persists stable cryptographic keys on startup in `.qseal_keys.json`.
+QRouter generates and persists stable cryptographic keys on startup in `.qseal_keys.json`.
 
-- Public verification endpoint: `GET /.well-known/qseal-keys.json` or `GET /v1/quantum-keys`
+- Public verification endpoint: `GET /.well-known/qrouter-keys.json` or `GET /v1/quantum-keys`
 - Verify any receipt ID:
   ```bash
-  curl -X POST http://localhost:4020/v1/receipts/verify \
+  curl -X POST https://api.qrouter.cloud/v1/receipts/verify \
     -H "Content-Type: application/json" \
     -d '{"receipt_id": "rcpt_6f8dcd7b537046c4be2eb8b872faab69"}'
   ```

@@ -26,14 +26,14 @@ const STEPS: Array<{ title: string; body: string; icon: typeof Send; status: Ava
     body: 'The answer comes back with a receipt signed with ML-DSA-65 and Ed25519 over hashes of the prompt and the response.',
     icon: FileSignature,
     status: 'available',
-    code: 'qseal_receipt',
+    code: 'qrouter_receipt',
   },
   {
     title: 'Verification',
     body: 'Anyone holding the receipt can check it against QRouter’s published keys, in the app, through the API, or offline.',
     icon: ScanLine,
     status: 'available',
-    code: '/.well-known/qseal-keys.json',
+    code: '/.well-known/qrouter-keys.json',
   },
 ]
 

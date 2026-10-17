@@ -61,7 +61,7 @@ test('verify: genuine, tampered, foreign-key, by ID, and junk receipts', async (
 
 test('shows real catalogue data and the development-mode warning', async ({ page }) => {
   await page.goto('/app/models')
-  await expect(page.getByText('qseal-quantum-70b')).toBeVisible()
+  await expect(page.getByText('qrouter-quantum-70b')).toBeVisible()
   await expect(page.getByText('0.001 USDC').first()).toBeVisible()
   await expect(page.getByText(/Development gateway/)).toBeVisible()
 })

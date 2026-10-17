@@ -25,7 +25,7 @@ export function describeError(err: unknown): { title: string; detail: string } {
   if (err instanceof ApiError) {
     switch (err.kind) {
       case 'unconfigured':
-        return { title: 'Backend not configured', detail: 'Set VITE_QROUTER_API_URL or VITE_QSEAL_API_URL to connect this frontend to a QRouter backend.' }
+        return { title: 'Backend not configured', detail: 'Set VITE_QROUTER_API_URL to connect this frontend to a QRouter backend.' }
       case 'network':
         return {
           title: 'Backend unreachable',

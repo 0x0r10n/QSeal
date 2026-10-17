@@ -1,5 +1,5 @@
 /**
- * Geometry for the QSeal emblem: a ring of separated vertical chrome bars,
+ * Geometry for the QRouter emblem: a ring of separated vertical chrome bars,
  * heavier on the left, that disintegrates into loose cubes across its upper
  * right, closed by a framed diagonal blade as the tail.
  *

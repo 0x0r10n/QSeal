@@ -59,7 +59,7 @@ const assert = (cond: unknown, msg: string) => {
 };
 const chat = (body: any, headers: Record<string, string> = {}) =>
   request('/v1/chat/completions', { method: 'POST', headers, body });
-const msg = (content: string) => ({ model: 'qseal-quantum-70b', messages: [{ role: 'user', content }] });
+const msg = (content: string) => ({ model: 'qrouter-quantum-70b', messages: [{ role: 'user', content }] });
 const paymentSig = (signature: string) => Buffer.from(JSON.stringify({ version: 2, signature })).toString('base64');
 
 /** Point the gateway at an unreachable provider so models are "available" but inference fails. */
@@ -68,7 +68,7 @@ function withBrokenUpstream<T>(fn: () => Promise<T>): Promise<T> {
   config.upstreamProvider = 'custom';
   config.upstreamBaseUrl = 'http://127.0.0.1:1';
   config.upstreamApiKey = 'test';
-  process.env.UPSTREAM_MODEL_MAP = 'qseal-quantum-70b=test-model';
+  process.env.UPSTREAM_MODEL_MAP = 'qrouter-quantum-70b=test-model';
   return fn().finally(() => {
     config.upstreamProvider = saved.p;
     config.upstreamBaseUrl = saved.u;
@@ -79,7 +79,7 @@ function withBrokenUpstream<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 async function runTests() {
-  console.log(`\n=== QSeal gateway test suite ===\n`);
+  console.log(`\n=== QRouter gateway test suite ===\n`);
   server = app.listen(TEST_PORT, '127.0.0.1');
   await new Promise((r) => setTimeout(r, 200));
 
@@ -106,8 +106,8 @@ async function runTests() {
 
   await test('GET /v1/models lists catalogue models with pricing and who serves them', async () => {
     const res = await request('/v1/models');
-    const m = res.data.data.find((x: any) => x.id === 'qseal-quantum-70b');
-    assert(m, 'qseal-quantum-70b missing');
+    const m = res.data.data.find((x: any) => x.id === 'qrouter-quantum-70b');
+    assert(m, 'qrouter-quantum-70b missing');
     assert(m.pricing.price_per_request_usdc > 0, 'pricing missing');
     assert(m.served_by.provider === 'dev-engine', `served_by ${JSON.stringify(m.served_by)}`);
     assert(m.vendor === 'meta' && m.family === 'Llama 3.3 70B Instruct', `vendor/family ${m.vendor} ${m.family}`);
@@ -126,13 +126,13 @@ async function runTests() {
   let receiptId = '';
   const simSig = `sim_tx_${Date.now()}`;
   await test('Paid request succeeds with PAYMENT-RESPONSE and a v2 signed receipt', async () => {
-    const res = await chat(msg('What is QSeal?'), { 'PAYMENT-SIGNATURE': paymentSig(simSig) });
+    const res = await chat(msg('What is QRouter?'), { 'PAYMENT-SIGNATURE': paymentSig(simSig) });
     assert(res.status === 200, `expected 200, got ${res.status} ${JSON.stringify(res.data)}`);
     assert(res.data.choices[0].message.content.includes('dev engine'), 'dev engine output must be labelled');
     const settle = JSON.parse(Buffer.from(res.headers['payment-response'] as string, 'base64').toString('utf8'));
     assert(settle.settled, 'not settled');
-    assert(res.data.qseal_receipt.version === '2', 'receipt version');
-    receiptId = res.headers['x-qseal-receipt-id'] as string;
+    assert(res.data.qrouter_receipt.version === '2', 'receipt version');
+    receiptId = res.headers['x-qrouter-receipt-id'] as string;
   });
 
   await test('Replaying a spent payment signature is rejected', async () => {
@@ -141,8 +141,8 @@ async function runTests() {
     assert(/already spent/.test(res.data.error.reason), 'reason should mention replay');
   });
 
-  await test('GET /.well-known/qseal-keys.json returns public keys only', async () => {
-    const res = await request('/.well-known/qseal-keys.json');
+  await test('GET /.well-known/qrouter-keys.json returns public keys only', async () => {
+    const res = await request('/.well-known/qrouter-keys.json');
     assert(res.data.mlDsaPublicKey && res.data.mlKemPublicKey, 'keys missing');
     assert(!JSON.stringify(res.data).includes('SecretKey'), 'secret material exposed');
   });
@@ -156,7 +156,7 @@ async function runTests() {
 
   await test('A tampered receipt is rejected', async () => {
     const { data } = await request(`/v1/receipts/${receiptId}`);
-    const tampered = { ...data.receipt, model: 'qseal-deepseek-r1' };
+    const tampered = { ...data.receipt, model: 'qrouter-deepseek-r1' };
     const res = await request('/v1/receipts/verify', { method: 'POST', body: { receipt: tampered } });
     assert(res.data.verification.valid === false, 'tampered receipt accepted');
   });
@@ -275,14 +275,14 @@ async function runTests() {
 
   await test('MCP: initialize, list tools, paid inference only', async () => {
     const init = await request('/mcp', { method: 'POST', body: { jsonrpc: '2.0', id: 0, method: 'initialize', params: {} } });
-    assert(init.data.result.serverInfo.name === 'qseal', 'initialize');
+    assert(init.data.result.serverInfo.name === 'qrouter', 'initialize');
     const list = await request('/mcp', { method: 'POST', body: { jsonrpc: '2.0', id: 1, method: 'tools/list' } });
-    assert(list.data.result.tools.some((t: any) => t.name === 'qseal_infer'), 'tool missing');
-    const call = { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'qseal_infer', arguments: { prompt: 'Agent call' } } };
+    assert(list.data.result.tools.some((t: any) => t.name === 'qrouter_infer'), 'tool missing');
+    const call = { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'qrouter_infer', arguments: { prompt: 'Agent call' } } };
     const unpaid = await request('/mcp', { method: 'POST', body: call });
     assert(unpaid.data.error?.code === 402, `unpaid MCP call should be refused: ${JSON.stringify(unpaid.data)}`);
     const paid = await request('/mcp', { method: 'POST', body: call, headers: { Authorization: `Bearer ${apiKey}` } });
-    assert(paid.data.result.content[0].text && paid.data.result.qseal_receipt, 'paid MCP call failed');
+    assert(paid.data.result.content[0].text && (paid.data.result.qrouter_receipt || paid.data.result.qseal_receipt), 'paid MCP call failed');
   });
 
   await test('Access log never contains prepaid key secrets', async () => {
@@ -386,7 +386,7 @@ async function runTests() {
       assert(small.status === 402, 'deposit below the minimum was accepted');
     });
     await test('POST /v1/payments/prepare builds an unsigned USDC transfer for the wallet', async () => {
-      const res = await withBrokenUpstream(() => request('/v1/payments/prepare', { method: 'POST', body: { payer: payerKey, purpose: 'request', model: 'qseal-quantum-70b' } }));
+      const res = await withBrokenUpstream(() => request('/v1/payments/prepare', { method: 'POST', body: { payer: payerKey, purpose: 'request', model: 'qrouter-quantum-70b' } }));
       assert(res.status === 200, `expected 200, got ${res.status} ${JSON.stringify(res.data)}`);
       const tx = web3.Transaction.from(Buffer.from(res.data.transaction, 'base64'));
       assert(tx.feePayer?.toBase58() === payerKey, 'fee payer');

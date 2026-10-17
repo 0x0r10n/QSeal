@@ -22,7 +22,7 @@ export interface CatalogueModel {
 
 export const CATALOGUE: CatalogueModel[] = [
   {
-    id: 'qseal-quantum-70b',
+    id: 'qrouter-quantum-70b',
     family: 'Llama 3.3 70B Instruct',
     vendor: 'meta',
     description: 'General-purpose 70B instruction model. Default.',
@@ -36,7 +36,7 @@ export const CATALOGUE: CatalogueModel[] = [
     },
   },
   {
-    id: 'qseal-llama-3.3-70b',
+    id: 'qrouter-llama-3.3-70b',
     family: 'Llama 3.3 70B Instruct',
     vendor: 'meta',
     description: 'Meta’s Llama 3.3 70B, addressed by its own name.',
@@ -50,7 +50,7 @@ export const CATALOGUE: CatalogueModel[] = [
     },
   },
   {
-    id: 'qseal-deepseek-r1',
+    id: 'qrouter-deepseek-r1',
     family: 'DeepSeek R1',
     familyByProvider: { groq: 'DeepSeek R1 Distill Llama 70B' },
     vendor: 'deepseek',
@@ -65,7 +65,7 @@ export const CATALOGUE: CatalogueModel[] = [
     },
   },
   {
-    id: 'qseal-llama-3.1-8b',
+    id: 'qrouter-llama-3.1-8b',
     family: 'Llama 3.1 8B Instruct',
     vendor: 'meta',
     description: 'Small and fast, for simple, high-volume tasks.',
@@ -80,7 +80,12 @@ export const CATALOGUE: CatalogueModel[] = [
   },
 ];
 
-/** Custom providers expose their own model ids through UPSTREAM_MODEL_MAP="qseal-id=upstream-id,…". */
+export function normalizeModelId(id: string): string {
+  if (!id) return id;
+  return id.replace(/^qseal-/, 'qrouter-');
+}
+
+/** Custom providers expose their own model ids through UPSTREAM_MODEL_MAP="qrouter-id=upstream-id,…". */
 function customMap(): Record<string, string> {
   const raw = process.env.UPSTREAM_MODEL_MAP || '';
   return Object.fromEntries(
@@ -91,8 +96,9 @@ function customMap(): Record<string, string> {
 export function upstreamModelFor(id: string): string | undefined {
   const provider = config.upstreamProvider;
   if (!provider || !hasUpstream()) return config.allowDevBypass ? 'dev-engine' : undefined;
-  if (provider === 'custom') return customMap()[id];
-  return CATALOGUE.find((m) => m.id === id)?.upstream[provider];
+  const norm = normalizeModelId(id);
+  if (provider === 'custom') return customMap()[norm] || customMap()[id];
+  return CATALOGUE.find((m) => m.id === norm)?.upstream[provider];
 }
 
 /** The underlying model's name as served by the active provider. */
@@ -102,7 +108,8 @@ export function familyFor(m: CatalogueModel): string {
 }
 
 export function priceFor(id: string): number {
-  const m = CATALOGUE.find((x) => x.id === id);
+  const norm = normalizeModelId(id);
+  const m = CATALOGUE.find((x) => x.id === norm);
   return +(config.pricePerRequestUsdc * (m?.priceFactor ?? 1)).toFixed(6);
 }
 
@@ -112,5 +119,6 @@ export function availableModels(): CatalogueModel[] {
 }
 
 export function isAvailable(id: string): boolean {
-  return availableModels().some((m) => m.id === id);
+  const norm = normalizeModelId(id);
+  return availableModels().some((m) => m.id === norm);
 }

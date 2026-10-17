@@ -31,9 +31,10 @@ export interface HistoryEntry {
   sample?: boolean
 }
 
-const KEY = 'qseal.history.v1'
+const KEY = 'qrouter.history.v1'
+const LEGACY_KEY = 'qseal.history.v1'
 const MAX = 200
-let cache: HistoryEntry[] = readJSON<HistoryEntry[]>(local, KEY, [])
+let cache: HistoryEntry[] = readJSON<HistoryEntry[] | null>(local, KEY, null) ?? readJSON<HistoryEntry[]>(local, LEGACY_KEY, [])
 const listeners = new Set<() => void>()
 
 function emit() {

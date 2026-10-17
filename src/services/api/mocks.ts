@@ -1,7 +1,7 @@
 /**
  * DEVELOPMENT-ONLY sample data.
  *
- * Active only when `import.meta.env.DEV` and VITE_QSEAL_DEV_MOCKS=true and no
+ * Active only when `import.meta.env.DEV` and VITE_QROUTER_DEV_MOCKS=true and no
  * backend URL is set (see `backendMode`). Production builds can never reach
  * these code paths. Every value here is fictional and the UI labels it so.
  */

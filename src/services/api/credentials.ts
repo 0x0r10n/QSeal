@@ -1,28 +1,37 @@
 import { local, readJSON, remove, session, writeJSON } from '@/lib/storage'
 
 /**
- * The prepaid key (qseal_sk_…) used to pay for requests.
+ * The prepaid key (qrouter_sk_… or qseal_sk_…) used to pay for requests.
  *
  * By default it lives in sessionStorage (cleared when the tab closes). The
  * user can opt in to keeping it in localStorage on their own device. It is
  * never logged and is sent only as `Authorization: Bearer` to the gateway.
  */
-const KEY = 'qseal.accessKey'
+const KEY = 'qrouter.accessKey'
+const LEGACY_KEY = 'qseal.accessKey'
 const listeners = new Set<() => void>()
 let cached: string | null | undefined
 
 export function getAccessKey(): string | null {
-  if (cached === undefined) cached = readJSON<string | null>(session, KEY, null) ?? readJSON<string | null>(local, KEY, null)
+  if (cached === undefined) {
+    cached =
+      readJSON<string | null>(session, KEY, null) ??
+      readJSON<string | null>(local, KEY, null) ??
+      readJSON<string | null>(session, LEGACY_KEY, null) ??
+      readJSON<string | null>(local, LEGACY_KEY, null)
+  }
   return cached
 }
 
 export function isRemembered(): boolean {
-  return readJSON<string | null>(local, KEY, null) !== null
+  return readJSON<string | null>(local, KEY, null) !== null || readJSON<string | null>(local, LEGACY_KEY, null) !== null
 }
 
 export function setAccessKey(value: string | null, opts: { remember?: boolean } = {}): void {
   remove(session, KEY)
   remove(local, KEY)
+  remove(session, LEGACY_KEY)
+  remove(local, LEGACY_KEY)
   if (value) writeJSON(opts.remember ? local : session, KEY, value)
   cached = value
   listeners.forEach((l) => l())

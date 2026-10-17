@@ -46,7 +46,7 @@ export default function Keys() {
       {backendMode !== 'live' ? (
         <Panel bodyClassName="p-0">
           <StatePanel kind="unconfigured" title="No backend connected">
-            Set <code className="font-mono">VITE_QSEAL_API_URL</code> to buy and manage prepaid keys.
+            Set <code className="font-mono">VITE_QROUTER_API_URL</code> to buy and manage prepaid keys.
           </StatePanel>
         </Panel>
       ) : (
@@ -227,7 +227,7 @@ function AddKey() {
             spellCheck={false}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="qseal_sk_…"
+            placeholder="qrouter_sk_…"
             aria-invalid={Boolean(value) && !valid}
             className={cn(fieldClass, 'h-11 pr-11 font-mono')}
           />
@@ -240,7 +240,7 @@ function AddKey() {
             {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
         </div>
-        {value && !valid && <p className="mt-2 text-[12.5px] text-bad">Keys look like qseal_sk_ followed by 48 hex characters.</p>}
+        {value && !valid && <p className="mt-2 text-[12.5px] text-bad">Keys look like qrouter_sk_ followed by 48 hex characters.</p>}
         <label className="mt-4 flex items-center gap-2 text-[13px] text-steel-300">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-steel-100" />
           Remember on this device

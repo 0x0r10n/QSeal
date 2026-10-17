@@ -3,7 +3,7 @@
  *
  * "Valid" is only ever reported after the ML-DSA-65 and Ed25519 signatures
  * have been checked in this browser against the keys the gateway publishes
- * at /.well-known/qseal-keys.json. The gateway's own verdict is shown
+ * at /.well-known/qrouter-keys.json. The gateway's own verdict is shown
  * alongside as a second opinion, never instead of the local check.
  */
 import { backendMode } from '@/lib/env'
@@ -48,8 +48,14 @@ export async function verifyReceipt(text: string): Promise<VerificationOutcome> 
       return { status: 'unsupported', summary: 'Unsupported format', reason: 'Expected a receipt as JSON, or a receipt ID (rcpt_…).' }
     }
     // Accept a whole completion response too.
-    if (candidate && typeof candidate === 'object' && 'qseal_receipt' in candidate) {
-      candidate = (candidate as { qseal_receipt: unknown }).qseal_receipt
+    if (candidate && typeof candidate === 'object') {
+      if ('qrouter_receipt' in candidate) {
+        candidate = (candidate as { qrouter_receipt: unknown }).qrouter_receipt
+      } else if ('qseal_receipt' in candidate) {
+        candidate = (candidate as { qseal_receipt: unknown }).qseal_receipt
+      } else if ('receipt' in candidate) {
+        candidate = (candidate as { receipt: unknown }).receipt
+      }
     }
   }
 
@@ -108,8 +114,11 @@ export async function verifyReceipt(text: string): Promise<VerificationOutcome> 
 
 /** Pull the receipt out of a completion response. */
 export function extractReceipt(raw: unknown): QSealReceipt | null {
-  if (raw && typeof raw === 'object' && 'qseal_receipt' in raw) {
-    const r = (raw as { qseal_receipt: unknown }).qseal_receipt
+  if (raw && typeof raw === 'object') {
+    const r =
+      ('qrouter_receipt' in raw && (raw as { qrouter_receipt: unknown }).qrouter_receipt) ||
+      ('qseal_receipt' in raw && (raw as { qseal_receipt: unknown }).qseal_receipt) ||
+      ('receipt' in raw && (raw as { receipt: unknown }).receipt)
     if (r && typeof r === 'object' && 'pqc' in r) return r as QSealReceipt
   }
   return null

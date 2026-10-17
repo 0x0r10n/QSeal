@@ -80,7 +80,7 @@ function ModelsTile() {
 
 const RECEIPT_FIELDS: Array<[string, string]> = [
   ['id', 'rcpt_6f8d…'],
-  ['model', 'qseal-quantum-70b'],
+  ['model', 'qrouter-quantum-70b'],
   ['promptHash', 'sha256 · 79b3…'],
   ['responseHash', 'sha256 · 1c8c…'],
   ['tokens', '2 · 46 · 48'],
@@ -102,7 +102,7 @@ function ReceiptTile() {
           className="relative w-full max-w-[280px] rounded-t-xl border border-b-0 border-white/10 bg-[linear-gradient(180deg,#1c1c21,#121215)] px-5 pb-9 pt-5 shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]"
         >
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-steel-400">qseal_receipt</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-steel-400">qrouter_receipt</span>
             <span className="font-mono text-[9.5px] text-steel-600">v2</span>
           </div>
           <dl className="mt-4 space-y-1.5 font-mono text-[10.5px]">

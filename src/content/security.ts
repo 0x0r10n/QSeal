@@ -49,7 +49,7 @@ export const SECURITY_LAYERS: SecurityLayer[] = [
     name: 'Signed receipts & verification',
     short: 'A portable, checkable record of every completion.',
     covers:
-      'Every completion returns a receipt signed with ML-DSA-65 and Ed25519 over the prompt and response hashes, model, token counts and payment. Anyone can check it against the keys at /.well-known/qseal-keys.json.',
+      'Every completion returns a receipt signed with ML-DSA-65 and Ed25519 over the prompt and response hashes, model, token counts and payment. Anyone can check it against the keys at /.well-known/qrouter-keys.json.',
     notClaimed: 'That a receipt proves an answer is correct, or any zero-knowledge proof of computation. It proves what the gateway recorded and signed.',
     status: 'available',
   },

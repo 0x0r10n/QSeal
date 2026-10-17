@@ -19,7 +19,7 @@ export const VENDOR_NAME: Record<ModelVendor, string> = { meta: 'Meta', deepseek
 
 export const MODEL_CATALOGUE: CatalogueEntry[] = [
   {
-    id: 'qseal-quantum-70b',
+    id: 'qrouter-quantum-70b',
     family: 'Llama 3.3 70B Instruct',
     vendor: 'meta',
     description: 'General-purpose 70B instruction model. Default.',
@@ -27,7 +27,7 @@ export const MODEL_CATALOGUE: CatalogueEntry[] = [
     tags: ['Default', 'General'],
   },
   {
-    id: 'qseal-llama-3.3-70b',
+    id: 'qrouter-llama-3.3-70b',
     family: 'Llama 3.3 70B Instruct',
     vendor: 'meta',
     description: 'Meta’s Llama 3.3 70B, addressed by its own name.',
@@ -35,7 +35,7 @@ export const MODEL_CATALOGUE: CatalogueEntry[] = [
     tags: ['General'],
   },
   {
-    id: 'qseal-deepseek-r1',
+    id: 'qrouter-deepseek-r1',
     family: 'DeepSeek R1',
     vendor: 'deepseek',
     description: 'Reasoning model that thinks before it answers.',
@@ -43,7 +43,7 @@ export const MODEL_CATALOGUE: CatalogueEntry[] = [
     tags: ['Reasoning'],
   },
   {
-    id: 'qseal-llama-3.1-8b',
+    id: 'qrouter-llama-3.1-8b',
     family: 'Llama 3.1 8B Instruct',
     vendor: 'meta',
     description: 'Small and fast, for simple, high-volume tasks.',

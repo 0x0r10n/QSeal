@@ -30,8 +30,8 @@ export function ConfigBanner() {
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-[13px] text-steel-400 sm:px-6">
       <PlugZap className="size-4 shrink-0 text-steel-300" />
       <span>
-        {env.apiUrlInvalid ? 'VITE_QSEAL_API_URL is not a valid URL.' : 'No backend connected.'} Set{' '}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[12px] text-steel-200">VITE_QSEAL_API_URL</code> to enable
+        {env.apiUrlInvalid ? 'VITE_QROUTER_API_URL is not a valid URL.' : 'No backend connected.'} Set{' '}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[12px] text-steel-200">VITE_QROUTER_API_URL</code> to enable
         live data.
       </span>
       <Link to="/app/settings#backend" className="ml-auto text-steel-200 underline decoration-white/20 underline-offset-4 hover:decoration-white">

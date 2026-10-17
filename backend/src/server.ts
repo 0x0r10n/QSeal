@@ -32,8 +32,14 @@ app.use(
       'X-Payment-Signature',
       'X-Payment-Reference',
       'X-Dev-Bypass',
+      'X-QRouter-Encrypted',
+      'X-QRouter-Kem',
       'X-QSeal-Encrypted',
       'X-QSeal-Kem',
+      'x-qrouter-encrypted',
+      'x-qrouter-kem',
+      'x-qseal-encrypted',
+      'x-qseal-kem',
       'X-Trial-Wallet',
       'X-Wallet-Address',
       'x-trial-wallet',
@@ -52,6 +58,13 @@ app.use(
       'X-402-Amount',
       'X-402-Reference',
       'X-402-Pay-Url',
+      'X-QRouter-Receipt-Id',
+      'X-QRouter-Receipt-Signature',
+      'X-QRouter-Receipt-Ed25519',
+      'X-QRouter-PQC-Algorithm',
+      'X-QRouter-Prompt-Hash',
+      'X-QRouter-Response-Hash',
+      'X-QRouter-Sealed',
       'X-QSeal-Receipt-Id',
       'X-QSeal-Receipt-Signature',
       'X-QSeal-Receipt-Ed25519',
@@ -59,6 +72,8 @@ app.use(
       'X-QSeal-Prompt-Hash',
       'X-QSeal-Response-Hash',
       'X-QSeal-Sealed',
+      'x-qrouter-receipt-id',
+      'x-qrouter-sealed',
       'X-Trial-Remaining',
       'x-trial-remaining',
     ],
@@ -71,11 +86,11 @@ app.use(express.json({ limit: '10mb' }));
  * Zero-logging policy: method, path and status only. Never bodies, prompts
  * or completions. Secrets that may appear in paths are redacted.
  */
-const redact = (p: string) => p.replace(/qseal_sk_[A-Za-z0-9_]+/g, 'qseal_sk_[redacted]');
+const redact = (p: string) => p.replace(/(qrouter_sk_|qseal_sk_)[A-Za-z0-9_]+/g, '$1[redacted]');
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   res.on('finish', () => {
-    console.log(`[QSeal Gateway] ${new Date().toISOString()} ${req.method} ${redact(req.path)} -> ${res.statusCode} (${Date.now() - start}ms)`);
+    console.log(`[QRouter Gateway] ${new Date().toISOString()} ${req.method} ${redact(req.path)} -> ${res.statusCode} (${Date.now() - start}ms)`);
   });
   next();
 });
@@ -127,6 +142,7 @@ api.post('/v1/payments/prepare', strict, handlePreparePayment);
 
 // Public verification keys
 api.get('/v1/quantum-keys', reads, handleGetQuantumKeys);
+api.get('/.well-known/qrouter-keys.json', reads, handleGetQuantumKeys);
 api.get('/.well-known/qseal-keys.json', reads, handleGetQuantumKeys);
 
 // Free trial status
@@ -166,7 +182,7 @@ api.get('/health', reads, (_req: Request, res: Response) => {
       algorithms: 'NIST ML-KEM-768 + NIST ML-DSA-65 + Ed25519',
       ml_kem_pubkey_hash: keys.mlKemPublicKey.slice(0, 16) + '...',
       ml_dsa_pubkey_hash: keys.mlDsaPublicKey.slice(0, 16) + '...',
-      verification_url: '/.well-known/qseal-keys.json',
+      verification_url: '/.well-known/qrouter-keys.json',
     },
     upstream: {
       provider: hasUpstream() ? config.upstreamProvider : config.allowDevBypass ? 'dev-engine' : 'none',
@@ -182,14 +198,14 @@ api.get('/health', reads, (_req: Request, res: Response) => {
 });
 
 const info = {
-  name: 'QSeal Gateway',
+  name: 'QRouter Gateway',
   tagline: 'Private AI for Solana agents. Quantum-resistant receipts. Pay with USDC.',
   version: VERSION,
   endpoints: {
     completions: 'POST /v1/chat/completions',
     models: 'GET /v1/models',
     quantum_keys: 'GET /v1/quantum-keys',
-    well_known_keys: 'GET /.well-known/qseal-keys.json',
+    well_known_keys: 'GET /.well-known/qrouter-keys.json',
     prepaid_keys: 'POST /v1/keys/prepaid',
     topup: 'POST /v1/keys/topup',
     balance: 'GET /v1/keys/balance',

@@ -22,7 +22,8 @@ const CONNECT = 'standard:connect'
 const DISCONNECT = 'standard:disconnect'
 const EVENTS = 'standard:events'
 const SIGN_AND_SEND = 'solana:signAndSendTransaction'
-const LAST = 'qseal.wallet.last'
+const LAST = 'qrouter.wallet.last'
+const LEGACY_LAST = 'qseal.wallet.last'
 
 type Features = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -194,7 +195,7 @@ function start() {
   setTimeout(refreshWallets, 1500)
 
   // Quietly restore the last wallet the user connected.
-  const last = readJSON<string | null>(local, LAST, null)
+  const last = readJSON<string | null>(local, LAST, null) ?? readJSON<string | null>(local, LEGACY_LAST, null)
   if (last) {
     const tryRestore = () => {
       const w = state.available.find((x) => x.name.toLowerCase() === last.toLowerCase())

@@ -16,11 +16,13 @@ export async function getHealth(signal?: AbortSignal): Promise<Health> {
 let keysCache: { at: number; keys: Promise<GatewayKeys> } | null = null
 const KEYS_TTL_MS = 10 * 60_000
 
-/** GET /.well-known/qseal-keys.json — the published receipt verification keys (cached for 10 minutes). */
+/** GET /.well-known/qrouter-keys.json (or /.well-known/qseal-keys.json) — the published receipt verification keys (cached for 10 minutes). */
 export function getGatewayKeys(signal?: AbortSignal): Promise<GatewayKeys> {
   requireLive()
   if (keysCache && Date.now() - keysCache.at < KEYS_TTL_MS) return keysCache.keys
-  const keys = request<GatewayKeys>('/.well-known/qseal-keys.json', { signal, timeoutMs: 15_000, auth: false }).then((r) => r.data)
+  const keys = request<GatewayKeys>('/.well-known/qrouter-keys.json', { signal, timeoutMs: 15_000, auth: false })
+    .catch(() => request<GatewayKeys>('/.well-known/qseal-keys.json', { signal, timeoutMs: 15_000, auth: false }))
+    .then((r) => r.data)
   keysCache = { at: Date.now(), keys }
   keys.catch(() => {
     keysCache = null

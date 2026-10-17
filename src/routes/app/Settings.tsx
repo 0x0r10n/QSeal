@@ -67,7 +67,7 @@ export default function Settings() {
       <div className="grid gap-4">
         <div id="backend" className="scroll-mt-20">
           <Panel title="Network" actions={<BackendStatusPill />}>
-            <Row label="Backend URL" hint="Set at build time with VITE_QSEAL_API_URL. Not editable here.">
+            <Row label="Backend URL" hint="Set at build time with VITE_QROUTER_API_URL. Not editable here.">
               <code className="block max-w-[320px] truncate rounded-lg bg-white/[0.04] px-3 py-1.5 font-mono text-[12px] text-steel-200">
                 {env.apiUrl ?? (env.apiUrlInvalid ? 'Invalid value' : 'Not configured')}
               </code>

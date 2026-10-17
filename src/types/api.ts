@@ -1,5 +1,5 @@
 /**
- * Types for the QSeal gateway contracts (see backend/src/routes). Only the
+ * Types for the QRouter gateway contracts (see backend/src/routes). Only the
  * fields this UI reads are typed; responses are kept in `raw` where useful.
  */
 export interface ModelInfo {
@@ -71,6 +71,8 @@ export interface QSealReceipt {
     ed25519Signature: string
   }
 }
+
+export type QRouterReceipt = QSealReceipt
 
 export interface Health {
   status: string

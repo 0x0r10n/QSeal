@@ -30,7 +30,7 @@ const keys = (): GatewayKeys => backend.pqc.getPublicKeys()
 
 describe('sealing is compatible with the gateway', () => {
   it('the gateway can open a request sealed in the browser', async () => {
-    const body = { model: 'qseal-quantum-70b', messages: [{ role: 'user', content: 'sealed ✓ ünïcode' }] }
+    const body = { model: 'qrouter-quantum-70b', messages: [{ role: 'user', content: 'sealed ✓ ünïcode' }] }
     const { payload } = await sealRequest(body, keys().mlKemPublicKey)
     expect(backend.PromptSealer.unseal(payload)).toEqual(body)
   })
@@ -45,7 +45,7 @@ describe('sealing is compatible with the gateway', () => {
 
 describe('receipt verification matches the gateway', () => {
   const issue = (): QSealReceipt =>
-    backend.ReceiptManager.create('qseal-quantum-70b', 'a'.repeat(64), 'b'.repeat(64), { promptTokens: 3, completionTokens: 5, totalTokens: 8 }, { type: 'prepaid-key', amountUsdc: 0.001 }, true)
+    backend.ReceiptManager.create('qrouter-quantum-70b', 'a'.repeat(64), 'b'.repeat(64), { promptTokens: 3, completionTokens: 5, totalTokens: 8 }, { type: 'prepaid-key', amountUsdc: 0.001 }, true)
 
   it('uses the same canonical form', () => {
     const r = issue()
@@ -59,7 +59,7 @@ describe('receipt verification matches the gateway', () => {
   it('rejects any altered field', () => {
     const r = issue()
     for (const tampered of [
-      { ...r, model: 'qseal-deepseek-r1' },
+      { ...r, model: 'qrouter-deepseek-r1' },
       { ...r, tokens: { ...r.tokens, totalTokens: 9 } },
       { ...r, payment: { ...r.payment, amountUsdc: 0 } },
       { ...r, sealed: false },

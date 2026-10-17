@@ -13,17 +13,17 @@ export const SNIPPETS: Array<{ id: string; label: string; file: string; lang: La
     code: `import OpenAI from "openai"
 
 const qrouter = new OpenAI({
-  baseURL: \`\${process.env.QROUTER_API_URL || process.env.QSEAL_API_URL}/v1\`,
+  baseURL: \`\${process.env.QROUTER_API_URL || 'https://api.qrouter.cloud'}/v1\`,
   apiKey: process.env.QROUTER_KEY || process.env.QSEAL_KEY, // your prepaid key
 })
 
 const completion = await qrouter.chat.completions.create({
-  model: "qseal-quantum-70b",
+  model: "qrouter-quantum-70b",
   messages: [{ role: "user", content: "Summarise this contract." }],
 })
 
 console.log(completion.choices[0].message.content)
-console.log(completion.qseal_receipt.id) // signed ML-DSA-65 + Ed25519 receipt`,
+console.log(completion.qrouter_receipt?.id || (completion as any).qseal_receipt?.id) // signed ML-DSA-65 + Ed25519 receipt`,
   },
   {
     id: 'python',
@@ -34,35 +34,35 @@ console.log(completion.qseal_receipt.id) // signed ML-DSA-65 + Ed25519 receipt`,
 from openai import OpenAI
 
 qrouter = OpenAI(
-    base_url=f"{os.environ.get('QROUTER_API_URL', os.environ.get('QSEAL_API_URL'))}/v1",
+    base_url=f"{os.environ.get('QROUTER_API_URL', 'https://api.qrouter.cloud')}/v1",
     api_key=os.environ.get("QROUTER_KEY", os.environ.get("QSEAL_KEY")),
 )
 
 completion = qrouter.chat.completions.create(
-    model="qseal-quantum-70b",
+    model="qrouter-quantum-70b",
     messages=[{"role": "user", "content": "Summarise this contract."}],
 )
 
 print(completion.choices[0].message.content)
-print(completion.model_extra["qseal_receipt"]["id"])  # signed receipt`,
+print(completion.model_extra.get("qrouter_receipt", completion.model_extra.get("qseal_receipt", {}))["id"])  # signed receipt`,
   },
   {
     id: 'curl',
     label: 'cURL',
     file: 'request.sh',
     lang: 'bash',
-    code: `curl "\${QROUTER_API_URL:-$QSEAL_API_URL}/v1/chat/completions" \\
+    code: `curl "\${QROUTER_API_URL:-https://api.qrouter.cloud}/v1/chat/completions" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer \${QROUTER_KEY:-$QSEAL_KEY}" \\
   -d '{
-    "model": "qseal-quantum-70b",
+    "model": "qrouter-quantum-70b",
     "messages": [
       { "role": "user", "content": "Summarise this contract." }
     ]
   }'
 
 # Verify the receipt that comes back
-curl -X POST "\${QROUTER_API_URL:-$QSEAL_API_URL}/v1/receipts/verify" \\
+curl -X POST "\${QROUTER_API_URL:-https://api.qrouter.cloud}/v1/receipts/verify" \\
   -H "Content-Type: application/json" \\
   -d '{ "receipt_id": "rcpt_…" }'`,
   },

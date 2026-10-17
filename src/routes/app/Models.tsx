@@ -39,7 +39,7 @@ export default function Models() {
       <Panel bodyClassName="p-0">
         {backendMode === 'unconfigured' ? (
           <StatePanel kind="unconfigured" title="No backend configured">
-            Set <code className="font-mono">VITE_QSEAL_API_URL</code> to load the model catalogue.
+            Set <code className="font-mono">VITE_QROUTER_API_URL</code> to load the model catalogue.
           </StatePanel>
         ) : q.isPending ? (
           <div className="grid gap-px bg-white/[0.04] sm:grid-cols-2">

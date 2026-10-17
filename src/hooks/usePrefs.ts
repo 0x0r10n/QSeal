@@ -6,9 +6,14 @@ export interface Prefs {
   sidebarCollapsed: boolean
 }
 
-const KEY = 'qseal.prefs.v1'
+const KEY = 'qrouter.prefs.v1'
+const LEGACY_KEY = 'qseal.prefs.v1'
 const DEFAULTS: Prefs = { motion: 'system', sidebarCollapsed: false }
-let prefs: Prefs = { ...DEFAULTS, ...readJSON<Partial<Prefs>>(local, KEY, {}) }
+let prefs: Prefs = {
+  ...DEFAULTS,
+  ...readJSON<Partial<Prefs> | null>(local, KEY, null),
+  ...readJSON<Partial<Prefs>>(local, LEGACY_KEY, {}),
+}
 const listeners = new Set<() => void>()
 
 export function setPrefs(patch: Partial<Prefs>) {

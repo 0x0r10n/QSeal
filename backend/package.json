@@ -1,7 +1,7 @@
 {
-  "name": "qseal-backend",
+  "name": "qrouter-backend",
   "version": "1.1.0",
-  "description": "QSeal: Quantum-secure private AI inference gateway for Solana agents",
+  "description": "QRouter: Quantum-secure private AI inference gateway for Solana agents",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {

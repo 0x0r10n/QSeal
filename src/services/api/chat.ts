@@ -53,7 +53,7 @@ export async function createChatCompletion(req: ChatCompletionRequest, signal?: 
     headers: res.headers,
     raw: completion,
     receipt: extractReceipt(res.data),
-    sealed: res.headers['x-qseal-sealed'] === 'true',
+    sealed: res.headers['x-qrouter-sealed'] === 'true' || res.headers['x-qseal-sealed'] === 'true',
     latencyMs: res.latencyMs,
   }
 }

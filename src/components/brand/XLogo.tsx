@@ -6,7 +6,7 @@ interface Props {
 }
 
 /**
- * Clean, metallic monochrome X (formerly Twitter) icon matching QSeal's UI palette.
+ * Clean, metallic monochrome X (formerly Twitter) icon matching QRouter's UI palette.
  */
 export function XLogo({ className, size = 16 }: Props) {
   return (

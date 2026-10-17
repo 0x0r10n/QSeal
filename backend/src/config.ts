@@ -103,7 +103,7 @@ export const config: QSealConfig = {
   upstreamBaseUrl: detectedBaseUrl,
   upstreamApiKey: detectedApiKey,
   upstreamTimeoutMs: num(process.env.UPSTREAM_TIMEOUT_MS, 120_000),
-  defaultModel: process.env.DEFAULT_MODEL || 'qseal-quantum-70b',
+  defaultModel: process.env.DEFAULT_MODEL || 'qrouter-quantum-70b',
   allowDevBypass: process.env.ALLOW_DEV_BYPASS === 'true',
   rateLimitMax: num(process.env.RATE_LIMIT_MAX, 60),
   rateLimitWindowMs: num(process.env.RATE_LIMIT_WINDOW_MS, 60_000),

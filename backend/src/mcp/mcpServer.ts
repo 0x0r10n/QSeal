@@ -8,9 +8,30 @@ import { validateChatBody } from '../routes/validate.js';
 
 export const MCP_TOOLS = [
   {
-    name: 'qseal_infer',
+    name: 'qrouter_infer',
     description:
-      'Run a private LLM inference through QSeal with a signed ML-DSA-65 receipt. Requires payment: an Authorization: Bearer prepaid key or an x402 PAYMENT-SIGNATURE header on the MCP request.',
+      'Run a private LLM inference through QRouter with a signed ML-DSA-65 receipt. Requires payment: an Authorization: Bearer prepaid key or an x402 PAYMENT-SIGNATURE header on the MCP request.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'The prompt for the model' },
+        model: { type: 'string', description: `Model identifier (default: ${config.defaultModel})` },
+      },
+      required: ['prompt'],
+    },
+  },
+  {
+    name: 'qrouter_verify_receipt',
+    description: 'Verify a QRouter receipt against this gateway’s published ML-DSA-65 and Ed25519 keys.',
+    inputSchema: {
+      type: 'object',
+      properties: { receipt_id: { type: 'string', description: 'Receipt ID (rcpt_...)' } },
+      required: ['receipt_id'],
+    },
+  },
+  {
+    name: 'qseal_infer',
+    description: 'Legacy alias for qrouter_infer.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -22,7 +43,7 @@ export const MCP_TOOLS = [
   },
   {
     name: 'qseal_verify_receipt',
-    description: 'Verify a QSeal receipt against this gateway’s published ML-DSA-65 and Ed25519 keys.',
+    description: 'Legacy alias for qrouter_verify_receipt.',
     inputSchema: {
       type: 'object',
       properties: { receipt_id: { type: 'string', description: 'Receipt ID (rcpt_...)' } },
@@ -45,7 +66,7 @@ export async function handleMcpRequest(req: Request, res: Response) {
       result: {
         protocolVersion: params?.protocolVersion || '2025-03-26',
         capabilities: { tools: {} },
-        serverInfo: { name: 'qseal', version: '1.1.0' },
+        serverInfo: { name: 'qrouter', version: '1.1.0' },
       },
     });
   }
@@ -56,7 +77,7 @@ export async function handleMcpRequest(req: Request, res: Response) {
     const toolName = params?.name;
     const args = params?.arguments || {};
 
-    if (toolName === 'qseal_infer') {
+    if (toolName === 'qrouter_infer' || toolName === 'qseal_infer') {
       if (typeof args.prompt !== 'string' || !args.prompt) return toolText(res, id, 'prompt is required', true);
       const v = validateChatBody({ model: args.model, messages: [{ role: 'user', content: args.prompt }] });
       if (!v.ok) return toolText(res, id, v.message, true);
@@ -70,7 +91,7 @@ export async function handleMcpRequest(req: Request, res: Response) {
             code: 402,
             message: payment.error && payment.error !== 'No payment proof provided'
               ? `Payment required: ${payment.error}`
-              : 'Payment required: send a prepaid key (Authorization: Bearer qseal_sk_…) or an x402 PAYMENT-SIGNATURE header',
+              : 'Payment required: send a prepaid key (Authorization: Bearer qrouter_sk_…) or an x402 PAYMENT-SIGNATURE header',
             data: { x402: challenge },
           },
         });
@@ -90,14 +111,14 @@ export async function handleMcpRequest(req: Request, res: Response) {
           { type: payment.type, reference: payment.reference, signature: payment.signature, amountUsdc: payment.amountUsdc },
           false,
         );
-        return toolText(res, id, content, false, { qseal_receipt: receipt });
+        return toolText(res, id, content, false, { qrouter_receipt: receipt, qseal_receipt: receipt, receipt });
       } catch (err: any) {
         payment.refund?.();
         return toolText(res, id, `${err instanceof UpstreamError ? err.message : 'Inference failed'}. You were not charged.`, true);
       }
     }
 
-    if (toolName === 'qseal_verify_receipt') {
+    if (toolName === 'qrouter_verify_receipt' || toolName === 'qseal_verify_receipt') {
       const receipt = typeof args.receipt_id === 'string' ? ReceiptManager.get(args.receipt_id) : undefined;
       if (!receipt) return toolText(res, id, `Receipt not found: ${args.receipt_id}`, true);
       return toolText(res, id, JSON.stringify({ receipt_id: receipt.id, verification: ReceiptManager.verify(receipt) }, null, 2));

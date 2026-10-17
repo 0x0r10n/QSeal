@@ -67,6 +67,14 @@ export async function handleChatCompletions(req: Request, res: Response) {
     isSealed,
   );
 
+  res.setHeader('X-QRouter-Receipt-Id', receipt.id);
+  res.setHeader('X-QRouter-Receipt-Signature', receipt.pqc.mlDsaSignature);
+  res.setHeader('X-QRouter-Receipt-Ed25519', receipt.pqc.ed25519Signature);
+  res.setHeader('X-QRouter-PQC-Algorithm', receipt.pqc.algorithm);
+  res.setHeader('X-QRouter-Prompt-Hash', receipt.promptHash);
+  res.setHeader('X-QRouter-Response-Hash', receipt.responseHash);
+  res.setHeader('X-QRouter-Sealed', isSealed ? 'true' : 'false');
+
   res.setHeader('X-QSeal-Receipt-Id', receipt.id);
   res.setHeader('X-QSeal-Receipt-Signature', receipt.pqc.mlDsaSignature);
   res.setHeader('X-QSeal-Receipt-Ed25519', receipt.pqc.ed25519Signature);
@@ -82,8 +90,18 @@ export async function handleChatCompletions(req: Request, res: Response) {
 
   // Seal the response back to the client when it supplied an ephemeral ML-KEM key.
   if (isSealed && clientEphemeralKemPubkey) {
-    return res.status(200).json({ ...PromptSealer.sealResponse(response, clientEphemeralKemPubkey), qseal_receipt: receipt });
+    return res.status(200).json({
+      ...PromptSealer.sealResponse(response, clientEphemeralKemPubkey),
+      qrouter_receipt: receipt,
+      qseal_receipt: receipt,
+      receipt,
+    });
   }
 
-  return res.status(200).json({ ...response, qseal_receipt: receipt });
+  return res.status(200).json({
+    ...response,
+    qrouter_receipt: receipt,
+    qseal_receipt: receipt,
+    receipt,
+  });
 }
