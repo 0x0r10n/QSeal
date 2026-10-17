@@ -220,6 +220,36 @@ export function useWallet(): WalletState {
   )
 }
 
+function cleanWalletError(err: any, walletName: string = 'Phantom'): string {
+  const msg = String(err?.message || err || '')
+  const code = err?.code
+
+  if (
+    code === 4001 ||
+    msg.toLowerCase().includes('user rejected') ||
+    msg.toLowerCase().includes('rejected') ||
+    msg.toLowerCase().includes('cancelled') ||
+    msg.toLowerCase().includes('declined')
+  ) {
+    return `Connection request was cancelled in ${walletName}.`
+  }
+  if (code === -32002 || msg.toLowerCase().includes('already pending')) {
+    return `${walletName} popup is already open. Check the extension window to unlock and approve.`
+  }
+  if (
+    msg.toLowerCase().includes('unexpected error') ||
+    msg.toLowerCase().includes('disconnected port') ||
+    msg.toLowerCase().includes('failed to send message') ||
+    code === -32603
+  ) {
+    return `${walletName} is unresponsive or locked. Click the extension icon in your browser to unlock it, then retry.`
+  }
+  if (msg.toLowerCase().includes('no account') || msg.toLowerCase().includes('not share an account')) {
+    return `No account shared. Please unlock ${walletName} and approve the connection.`
+  }
+  return msg || `${walletName} refused the connection.`
+}
+
 export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } = {}) {
   const isPhantom = wallet.name.toLowerCase().includes('phantom')
   const isSolflare = wallet.name.toLowerCase().includes('solflare')
@@ -233,27 +263,57 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
     if (isPhantom) {
       const phantom = getPhantomProvider()
       if (phantom) {
-        try {
-          const res = await phantom.connect(opts.silent ? { onlyIfTrusted: true } : undefined)
-          const pubkey = res?.publicKey || phantom.publicKey
-          if (pubkey) {
-            const pubkeyStr = typeof pubkey.toBase58 === 'function' ? pubkey.toBase58() : pubkey.toString()
-            account = {
-              address: pubkeyStr,
-              publicKey: fromBase58(pubkeyStr),
-              chains: ['solana:mainnet', 'solana:devnet'],
-              features: [SIGN_AND_SEND],
+        // If already connected and authorized, use existing pubkey immediately
+        if (phantom.isConnected && phantom.publicKey) {
+          const pubkeyStr = typeof phantom.publicKey.toBase58 === 'function' ? phantom.publicKey.toBase58() : phantom.publicKey.toString()
+          account = {
+            address: pubkeyStr,
+            publicKey: fromBase58(pubkeyStr),
+            chains: ['solana:mainnet', 'solana:devnet'],
+            features: [SIGN_AND_SEND],
+          }
+        } else {
+          try {
+            const res = await phantom.connect(opts.silent ? { onlyIfTrusted: true } : undefined)
+            const pubkey = res?.publicKey || phantom.publicKey
+            if (pubkey) {
+              const pubkeyStr = typeof pubkey.toBase58 === 'function' ? pubkey.toBase58() : pubkey.toString()
+              account = {
+                address: pubkeyStr,
+                publicKey: fromBase58(pubkeyStr),
+                chains: ['solana:mainnet', 'solana:devnet'],
+                features: [SIGN_AND_SEND],
+              }
+            }
+          } catch (phErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+            if (opts.silent) return
+            // If MV3 service worker went idle / port disconnected, give it 350ms to wake up and retry once
+            const isWorkerAsleep =
+              phErr?.message?.toLowerCase().includes('unexpected error') ||
+              phErr?.message?.toLowerCase().includes('disconnected port') ||
+              phErr?.code === -32603
+
+            if (isWorkerAsleep) {
+              await new Promise((r) => setTimeout(r, 350))
+              try {
+                const retryRes = await phantom.connect()
+                const retryPubkey = retryRes?.publicKey || phantom.publicKey
+                if (retryPubkey) {
+                  const pubkeyStr = typeof retryPubkey.toBase58 === 'function' ? retryPubkey.toBase58() : retryPubkey.toString()
+                  account = {
+                    address: pubkeyStr,
+                    publicKey: fromBase58(pubkeyStr),
+                    chains: ['solana:mainnet', 'solana:devnet'],
+                    features: [SIGN_AND_SEND],
+                  }
+                }
+              } catch (retryErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+                throw new Error(cleanWalletError(retryErr, 'Phantom'))
+              }
+            } else {
+              throw new Error(cleanWalletError(phErr, 'Phantom'))
             }
           }
-        } catch (phErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-          if (opts.silent) return
-          if (phErr?.code === 4001 || phErr?.message?.toLowerCase().includes('rejected') || phErr?.message?.toLowerCase().includes('cancelled')) {
-            throw new Error('Connection request was declined or closed in Phantom. Please unlock your wallet and approve.')
-          }
-          if (phErr?.code === -32002 || phErr?.message?.toLowerCase().includes('already pending')) {
-            throw new Error('Phantom popup is already open. Please check the Phantom window to unlock and approve.')
-          }
-          // If native connect threw an unexpected error, attempt standard connect below
         }
       }
     }
@@ -266,13 +326,7 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
         account = (accounts as WalletAccount[])?.find((a) => a.chains?.some((c) => c.startsWith('solana:'))) ?? accounts?.[0] ?? null
       } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
         if (opts.silent) return
-        if (err?.code === 4001 || err?.message?.toLowerCase().includes('rejected') || err?.message?.toLowerCase().includes('cancelled')) {
-          throw new Error('Connection request was declined or closed. Please unlock your wallet and approve.')
-        }
-        if (err?.code === -32002 || err?.message?.toLowerCase().includes('already pending')) {
-          throw new Error('Wallet popup is already open. Please check your wallet window to unlock and approve.')
-        }
-        throw err
+        throw new Error(cleanWalletError(err, wallet.name))
       }
     }
 
@@ -280,27 +334,37 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
     if (!account && isSolflare) {
       const solflare = getSolflareProvider()
       if (solflare) {
-        try {
-          await solflare.connect(opts.silent ? { onlyIfTrusted: true } : undefined)
-          const pubkeyStr = solflare.publicKey?.toString()
-          if (pubkeyStr) {
-            account = {
-              address: pubkeyStr,
-              publicKey: fromBase58(pubkeyStr),
-              chains: ['solana:mainnet', 'solana:devnet'],
-              features: [SIGN_AND_SEND],
-            }
+        if (solflare.isConnected && solflare.publicKey) {
+          const pubkeyStr = solflare.publicKey.toString()
+          account = {
+            address: pubkeyStr,
+            publicKey: fromBase58(pubkeyStr),
+            chains: ['solana:mainnet', 'solana:devnet'],
+            features: [SIGN_AND_SEND],
           }
-        } catch (sfErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-          if (opts.silent) return
-          throw sfErr
+        } else {
+          try {
+            await solflare.connect(opts.silent ? { onlyIfTrusted: true } : undefined)
+            const pubkeyStr = solflare.publicKey?.toString()
+            if (pubkeyStr) {
+              account = {
+                address: pubkeyStr,
+                publicKey: fromBase58(pubkeyStr),
+                chains: ['solana:mainnet', 'solana:devnet'],
+                features: [SIGN_AND_SEND],
+              }
+            }
+          } catch (sfErr: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+            if (opts.silent) return
+            throw new Error(cleanWalletError(sfErr, 'Solflare'))
+          }
         }
       }
     }
 
     if (!account) {
       if (opts.silent) return
-      throw new Error('The wallet did not share an account. Please check the Phantom extension popup to unlock your wallet and approve.')
+      throw new Error(`The wallet did not share an account. Please check your ${wallet.name} extension popup to unlock and approve.`)
     }
 
     set({ wallet, account, error: null })
@@ -334,9 +398,9 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
     })
   } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!opts.silent) {
-      const msg = e instanceof Error ? e.message : 'The wallet refused the connection'
+      const msg = cleanWalletError(e, wallet.name)
       set({ error: msg })
-      throw e
+      throw new Error(msg)
     }
   } finally {
     set({ connecting: false, connectingWalletName: null })
