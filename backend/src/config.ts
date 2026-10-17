@@ -44,13 +44,17 @@ const caip2 = network === 'mainnet-beta'
   : 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
 
 // Auto-detect upstream provider
-let detectedProvider: UpstreamProvider | undefined;
+let detectedProvider: UpstreamProvider | undefined = process.env.UPSTREAM_PROVIDER as UpstreamProvider | undefined;
 let detectedBaseUrl = process.env.UPSTREAM_BASE_URL || process.env.OPENAI_BASE_URL;
 let detectedApiKey = process.env.UPSTREAM_API_KEY || process.env.OPENAI_API_KEY;
 
-if (process.env.GROQ_API_KEY) {
+if (detectedProvider === 'openrouter' || (!detectedProvider && !process.env.GROQ_API_KEY && process.env.OPENROUTER_API_KEY)) {
+  detectedProvider = 'openrouter';
+  detectedApiKey = detectedApiKey || process.env.OPENROUTER_API_KEY;
+  detectedBaseUrl = detectedBaseUrl || 'https://openrouter.ai/api/v1';
+} else if (detectedProvider === 'groq' || (!detectedProvider && process.env.GROQ_API_KEY)) {
   detectedProvider = 'groq';
-  detectedApiKey = process.env.GROQ_API_KEY;
+  detectedApiKey = detectedApiKey || process.env.GROQ_API_KEY;
   detectedBaseUrl = detectedBaseUrl || 'https://api.groq.com/openai/v1';
 } else if (process.env.OPENROUTER_API_KEY) {
   detectedProvider = 'openrouter';
