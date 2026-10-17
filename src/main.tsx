@@ -5,7 +5,7 @@ import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
 import './styles/index.css'
 import { Providers } from './app/providers'
-import { router } from './app/router'
+import { prefetchRoutes, router } from './app/router'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -14,3 +14,5 @@ createRoot(document.getElementById('root')!).render(
     </Providers>
   </StrictMode>,
 )
+
+window.addEventListener('load', prefetchRoutes, { once: true })

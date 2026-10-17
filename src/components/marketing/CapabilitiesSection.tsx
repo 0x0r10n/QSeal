@@ -10,6 +10,7 @@ import { ModelLogo } from '@/components/brand/ModelLogo'
 import { MODEL_CATALOGUE, VENDOR_NAME, formatContext } from '@/content/models'
 import { cn } from '@/lib/cn'
 import { useModels } from '@/hooks/useModels'
+import { useHealth, useReceiptStats } from '@/hooks/useGateway'
 import { backendMode } from '@/lib/env'
 import { EASE } from '@/lib/motion'
 
@@ -87,6 +88,7 @@ const RECEIPT_FIELDS: Array<[string, string]> = [
 ]
 
 function ReceiptTile() {
+  const stats = useReceiptStats()
   return (
     <SpotlightCard className="flex h-full flex-col p-7 sm:p-9">
       <p className="eyebrow">Signed receipts</p>
@@ -128,7 +130,9 @@ function ReceiptTile() {
         </motion.div>
       </div>
       <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-5">
-        <span className="text-[13px] text-steel-500">Hashes only. Never your prompt.</span>
+        <span className="text-[13px] text-steel-500">
+          {stats.data ? `${stats.data.totalReceiptsIssued.toLocaleString()} issued on this gateway` : 'Hashes only. Never your prompt.'}
+        </span>
         <Link to="/app/verify" className="inline-flex items-center gap-1 text-[13px] text-steel-200 hover:text-white">
           Verify one <ArrowUpRight className="size-3.5" />
         </Link>
@@ -138,15 +142,33 @@ function ReceiptTile() {
 }
 
 function PaymentsTile() {
+  const health = useHealth()
+  const sol = health.data?.solana
   const rails = [
-    { icon: Wallet, name: 'Pay per request', body: 'An x402 USDC transfer from your wallet, verified on-chain and usable once.' },
-    { icon: KeyRound, name: 'Prepaid key', body: 'Fund once with USDC, then call the API like any OpenAI key.' },
+    {
+      icon: Wallet,
+      name: 'Pay per request',
+      body: 'An x402 USDC transfer from your wallet, verified on-chain and usable once.',
+      live: sol ? `${sol.price_per_request_usdc} USDC per request` : undefined,
+    },
+    {
+      icon: KeyRound,
+      name: 'Prepaid key',
+      body: 'Fund once with USDC, then call the API like any OpenAI key.',
+      live: sol ? `From ${sol.min_prepaid_deposit_usdc} USDC deposit` : undefined,
+    },
   ]
   return (
     <SpotlightCard className="h-full p-7 sm:p-9">
       <div className="flex items-start justify-between gap-4">
         <p className="eyebrow">Payments & access</p>
-        <AvailabilityTag value="available" />
+        {sol ? (
+          <StatusTag tone={sol.network === 'mainnet-beta' ? 'ok' : 'warn'} pulse>
+            {sol.network === 'mainnet-beta' ? 'Solana mainnet' : 'Solana devnet'}
+          </StatusTag>
+        ) : (
+          <AvailabilityTag value="available" />
+        )}
       </div>
       <h3 className="mt-4 max-w-md text-2xl font-medium tracking-[-0.03em] text-steel-50">USDC on Solana. No account, no subscription.</h3>
       <div className="mt-9 grid gap-3 sm:grid-cols-2">
@@ -155,6 +177,7 @@ function PaymentsTile() {
             <r.icon className="size-5 text-steel-200" strokeWidth={1.5} />
             <p className="mt-6 font-medium text-steel-100">{r.name}</p>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-steel-500">{r.body}</p>
+            {r.live && <p className="mt-3 font-mono text-[12px] text-steel-200">{r.live}</p>}
           </div>
         ))}
       </div>

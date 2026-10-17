@@ -55,7 +55,6 @@ export function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; 
         </Link>
       </div>
       <nav aria-label="Application" className="flex flex-1 flex-col gap-0.5 px-2.5 pt-3">
-        <p className={cn('eyebrow mb-2 px-2.5 !text-[10px]', collapsed && 'lg:sr-only')}>Workspace</p>
         {APP_NAV.map((n) => (
           <Item key={n.to} {...n} end={'end' in n ? n.end : false} collapsed={collapsed} onNavigate={onNavigate} />
         ))}

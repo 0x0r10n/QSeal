@@ -10,8 +10,8 @@ export const spring: Transition = { type: 'spring', stiffness: 380, damping: 32,
 export const softSpring: Transition = { type: 'spring', stiffness: 120, damping: 22, mass: 1 }
 
 export const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 24, filter: 'blur(6px)' },
-  show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: DURATION.slow, ease: EASE } },
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: DURATION.base + 0.2, ease: EASE } },
 }
 
 export const stagger = (gap = 0.08, delay = 0): Variants => ({

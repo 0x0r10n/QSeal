@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import { ButtonLink } from '@/components/ui/Button'
 import { QEmblem } from '@/components/brand/QEmblem'
+import { LiveFacts } from './LiveFacts'
 import { useReducedMotion, useMediaQuery } from '@/hooks/useMediaQuery'
 import { hasWebGL } from '@/lib/webgl'
 import { DURATION, EASE } from '@/lib/motion'
@@ -61,8 +62,8 @@ export function Hero() {
         <div className="absolute inset-0 md:left-[42%]">
           {/* Static fallback — always present, cross-fades out once WebGL is ready */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.92, filter: 'blur(12px)' }}
-            animate={{ opacity: ready ? 0 : 1, scale: 1, filter: 'blur(0px)' }}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: ready ? 0 : 1, scale: 1 }}
             transition={{ duration: ready ? 0.8 : DURATION.cinematic, ease: EASE }}
             className="absolute inset-0 grid place-items-center"
           >
@@ -144,23 +145,7 @@ export function Hero() {
           </motion.div>
         </div>
 
-        <motion.dl
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.4, ease: EASE, delay: 1.2 }}
-          className="mt-14 hidden max-w-[640px] grid-cols-3 gap-8 border-t border-white/[0.07] pt-6 md:grid"
-        >
-          {[
-            ['Interface', 'OpenAI-compatible endpoints'],
-            ['Records', 'ML-DSA-65 signed receipts'],
-            ['Payment', 'USDC on Solana · x402'],
-          ].map(([k, v]) => (
-            <div key={k}>
-              <dt className="eyebrow !text-[10px]">{k}</dt>
-              <dd className="mt-2 text-[13.5px] leading-snug text-steel-200">{v}</dd>
-            </div>
-          ))}
-        </motion.dl>
+        <LiveFacts />
       </motion.div>
 
       <ScrollCue />

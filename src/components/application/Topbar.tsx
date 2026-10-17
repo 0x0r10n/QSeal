@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Menu, Plus, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { BackendStatusPill } from './BackendStatus'
 import { SidebarContent } from './Sidebar'
 import { APP_NAV, APP_NAV_SECONDARY } from './nav'
-import { ButtonLink } from '@/components/ui/Button'
 import { WalletMenu } from './WalletMenu'
 import { EASE } from '@/lib/motion'
 
@@ -35,20 +34,13 @@ export function Topbar() {
         >
           <Menu className="size-[18px]" />
         </button>
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[13px]">
-          <Link to="/app" className="hidden text-steel-500 hover:text-steel-200 sm:inline">Workspace</Link>
-          <span className="hidden text-steel-600 sm:inline">/</span>
-          <span className="truncate text-steel-100">{label}</span>
-        </nav>
+        <p className="min-w-0 truncate text-[13px] text-steel-100">{label}</p>
 
         <div className="ml-auto flex items-center gap-2">
           <BackendStatusPill className="hidden sm:inline-flex" />
           <div className="hidden md:block">
             <WalletMenu />
           </div>
-          <ButtonLink to="/app/new" size="sm" className="h-8 px-3.5">
-            <Plus className="size-3.5" /> <span className="hidden sm:inline">New request</span>
-          </ButtonLink>
         </div>
       </header>
 

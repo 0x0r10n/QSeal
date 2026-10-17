@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { backendMode } from '@/lib/env'
-import { getHealth, getKeyBalance } from '@/services/api/gateway'
+import { getHealth, getKeyBalance, getReceiptStats } from '@/services/api/gateway'
 import { useAccessKey } from './useAccessKey'
 
 export function useHealth() {
@@ -23,5 +23,16 @@ export function useKeyBalance() {
     enabled: backendMode === 'live' && Boolean(key),
     staleTime: 10_000,
     retry: false,
+  })
+}
+
+export function useReceiptStats() {
+  return useQuery({
+    queryKey: ['receipt-stats'],
+    queryFn: ({ signal }) => getReceiptStats(signal),
+    enabled: backendMode === 'live',
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: 1,
   })
 }

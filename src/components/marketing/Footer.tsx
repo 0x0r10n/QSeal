@@ -18,7 +18,6 @@ const COLS: Array<{ title: string; links: Array<{ label: string; to: string; ext
       { label: 'Technology', to: '/technology' },
       { label: 'Security', to: '/security' },
       { label: 'Documentation', to: '/docs' },
-      { label: 'Sign In', to: '/sign-in' },
     ],
   },
   {

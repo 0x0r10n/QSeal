@@ -36,7 +36,7 @@ export function MarketingLayout() {
         key={pathname}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, ease: EASE }}
+        transition={{ duration: 0.25, ease: EASE }}
       >
         <Outlet />
       </motion.main>

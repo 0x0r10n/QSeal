@@ -33,7 +33,7 @@ function scramble(seed: number, len: number) {
 
 function CipherLine({ revealed, label, sub, sealed }: { revealed: number; label: string; sub: string; sealed?: boolean }) {
   const cut = Math.floor(revealed * PLAIN.length)
-  const noise = useMemo(() => scramble(sealed ? Math.floor(revealed * 40) : 1, PLAIN.length), [revealed, sealed])
+  const noise = useMemo(() => scramble(sealed ? Math.floor(revealed * 12) : 1, PLAIN.length), [revealed, sealed])
   return (
     <div className="border-t border-white/[0.07] py-6">
       <div className="flex items-baseline justify-between gap-4">
@@ -58,8 +58,15 @@ export function ProblemSection() {
   const ref = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start 80%', 'end 40%'] })
-  const [p, setP] = useState(reduced ? 1 : 0)
-  useMotionValueEvent(scrollYProgress, 'change', (v) => !reduced && setP(Math.min(1, Math.max(0, v))))
+  // Quantised to whole characters so scrolling re-renders only when the text changes.
+  const steps = PLAIN.length
+  const [step, setStep] = useState(reduced ? steps : 0)
+  useMotionValueEvent(scrollYProgress, 'change', (v) => {
+    if (reduced) return
+    const next = Math.round(Math.min(1, Math.max(0, v)) * steps)
+    setStep((cur) => (cur === next ? cur : next))
+  })
+  const p = step / steps
 
   return (
     <section aria-labelledby="problem-title" className="relative py-28 md:py-40">
@@ -85,7 +92,7 @@ export function ProblemSection() {
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-steel-600">Illustration</span>
               </div>
               <div className="relative mt-6 h-px bg-white/[0.08]">
-                <motion.div className="absolute inset-y-0 left-0 bg-steel-200" style={{ width: `${p * 100}%` }} />
+                <motion.div className="absolute inset-y-0 left-0 w-full origin-left bg-steel-200" style={{ scaleX: reduced ? 1 : scrollYProgress }} />
                 <div className="absolute -top-6 left-0 font-mono text-[10px] text-steel-500">Captured</div>
                 <div className="absolute -top-6 right-0 font-mono text-[10px] text-steel-500">Future adversary</div>
               </div>

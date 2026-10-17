@@ -38,12 +38,12 @@ export function Nav() {
         className={cn(
           'border-b transition-[background,border-color,backdrop-filter] duration-500',
           solid || open
-            ? 'border-white/[0.06] bg-ink-950/75 backdrop-blur-xl backdrop-saturate-150'
+            ? 'border-white/[0.06] bg-ink-950/85 backdrop-blur-md'
             : 'border-transparent bg-transparent',
         )}
       >
         <nav aria-label="Primary" className="mx-auto flex h-16 max-w-[1400px] items-center gap-6 px-5 sm:px-8 lg:px-12">
-          <Link to="/" aria-label="QSeal home" className="rounded-md">
+          <Link to="/" aria-label="QSeal home" className="flex h-10 items-center rounded-md">
             <Wordmark />
           </Link>
 
@@ -77,12 +77,6 @@ export function Nav() {
           </ul>
 
           <div className="ml-auto flex items-center gap-2">
-            <Link
-              to="/sign-in"
-              className="hidden rounded-full px-3.5 py-2 text-[13.5px] text-steel-300 transition-colors hover:text-steel-50 sm:inline-flex"
-            >
-              Sign In
-            </Link>
             <span className="hidden sm:block">
               <ButtonLink to="/app" size="sm" className="h-9 px-4">
                 Launch App <ArrowRight className="size-3.5" />
@@ -110,10 +104,10 @@ export function Nav() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 top-16 z-40 flex flex-col bg-ink-950/97 px-5 pb-10 pt-6 backdrop-blur-xl md:hidden"
+            className="fixed inset-0 top-16 z-40 flex flex-col bg-ink-950 px-5 pb-10 pt-6 md:hidden"
           >
             <ul className="flex flex-col">
-              {[...LINKS, { to: '/sign-in', label: 'Sign In' }].map((l, i) => (
+              {LINKS.map((l, i) => (
                 <motion.li
                   key={l.to}
                   initial={{ opacity: 0, y: 16 }}

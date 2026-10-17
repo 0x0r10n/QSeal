@@ -82,9 +82,9 @@ export function QEmblem({ className, detail = 'full', title }: Props) {
 
 export function Wordmark({ className, compact = false }: { className?: string; compact?: boolean }) {
   return (
-    <span className={cn('inline-flex items-center gap-2.5', className)}>
-      <QEmblem className="h-[24px] w-auto" detail="mark" />
-      {!compact && <span className="text-[15px] font-semibold tracking-[-0.02em] text-steel-50">QSeal</span>}
+    <span className={cn('flex items-center gap-2.5', className)}>
+      <QEmblem className="h-[26px] w-auto" detail="mark" />
+      {!compact && <span className="text-[16px] font-semibold leading-none tracking-[-0.02em] text-steel-50">QSeal</span>}
     </span>
   )
 }

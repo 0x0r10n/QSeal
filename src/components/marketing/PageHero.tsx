@@ -27,8 +27,8 @@ export function PageHero({ eyebrow, title, lede, children }: { eyebrow: string; 
           <span className="h-px w-8 bg-steel-500" /> {eyebrow}
         </motion.p>
         <motion.h1
-          initial={{ opacity: 0, y: 24, filter: 'blur(8px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.2, ease: EASE, delay: 0.08 }}
           className="mt-6 max-w-4xl text-[clamp(2.5rem,7vw,5.25rem)] font-semibold leading-[0.98] tracking-[-0.05em] text-steel-50"
         >

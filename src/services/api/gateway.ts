@@ -103,3 +103,9 @@ export async function createDevKey(amountUsdc = 5) {
   })
   return data
 }
+
+/** GET /v1/receipts/stats — how many receipts this gateway has signed. */
+export async function getReceiptStats(signal?: AbortSignal): Promise<{ totalReceiptsIssued: number }> {
+  requireLive()
+  return (await request<{ totalReceiptsIssued: number }>('/v1/receipts/stats', { signal, timeoutMs: 10_000, auth: false })).data
+}

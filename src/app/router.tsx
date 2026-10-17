@@ -4,7 +4,21 @@ import { MarketingLayout } from '@/layouts/MarketingLayout'
 import { AppLayout } from '@/layouts/AppLayout'
 import Home from '@/routes/marketing/Home'
 
-function page(load: () => Promise<{ default: ComponentType }>) {
+type Loader = () => Promise<{ default: ComponentType }>
+const loaders: Loader[] = []
+
+/**
+ * Fetch every page's code in the background once the first page is idle,
+ * so later navigation never waits on a download.
+ */
+export function prefetchRoutes() {
+  const run = () => loaders.forEach((load) => void load().catch(() => {}))
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 4000 })
+  else setTimeout(run, 2000)
+}
+
+function page(load: Loader) {
+  loaders.push(load)
   const C = lazy(load)
   return (
     <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>

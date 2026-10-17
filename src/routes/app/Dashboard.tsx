@@ -14,12 +14,9 @@ import { useAccessKey } from '@/hooks/useAccessKey'
 import { useHealth, useKeyBalance } from '@/hooks/useGateway'
 import { shortAddress, useWallet } from '@/services/wallet/wallet'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
+import { greetingFor, useNow } from '@/hooks/useNow'
 import { backendMode, env } from '@/lib/env'
 
-function greeting() {
-  const h = new Date().getHours()
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-}
 
 export default function Dashboard() {
   useDocumentTitle('Dashboard')
@@ -29,6 +26,7 @@ export default function Dashboard() {
   const health = useHealth()
   const balance = useKeyBalance()
   const { account } = useWallet()
+  const now = useNow()
   const local = history.filter((e) => !e.sample || backendMode === 'mock')
   const completed = local.filter((e) => e.status === 'completed').length
   const failed = local.filter((e) => e.status === 'failed').length
@@ -36,8 +34,8 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader
-        eyebrow="Workspace"
-        title={greeting()}
+        eyebrow={new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(now)}
+        title={greetingFor(now)}
         description="Run private inference, keep the receipts, and verify them later."
         actions={
           <>
