@@ -60,17 +60,21 @@ test.describe('application', () => {
     await page.goto('/app/new')
     await expect(page.getByText('No backend connected.')).toBeVisible()
     await page.locator('#prompt').fill('Hello')
-    await expect(page.getByRole('button', { name: 'Seal & send' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled()
     await expect(page.getByText('Sending is disabled because no backend is configured')).toBeVisible()
   })
 
-  test('verify never reports valid without a verifier', async ({ page }) => {
+  test('verify never reports valid without a gateway', async ({ page }) => {
     await page.goto('/app/verify')
-    await page.locator('#receipt').fill('{"signature":"abc"}')
+    const receiptShaped = {
+      id: 'rcpt_x', version: '2', tokens: {}, payment: {},
+      pqc: { mlDsaSignature: 'ab', ed25519Signature: 'cd', mlDsaPublicKey: '', ed25519PublicKey: '' },
+    }
+    await page.locator('#receipt').fill(JSON.stringify(receiptShaped))
     await page.getByRole('button', { name: 'Verify', exact: true }).click()
-    await expect(page.getByText('Unable to verify', { exact: true })).toBeVisible()
+    await expect(page.getByText('Unable to verify', { exact: true }).last()).toBeVisible()
     await page.locator('#receipt').fill('not json')
     await page.getByRole('button', { name: 'Verify', exact: true }).click()
-    await expect(page.getByText('Unsupported format', { exact: true })).toBeVisible()
+    await expect(page.locator('[role=status][aria-live=polite]')).toContainText('Unsupported format')
   })
 })

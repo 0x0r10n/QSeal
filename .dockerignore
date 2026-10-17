@@ -1,0 +1,15 @@
+.git
+node_modules
+dist
+dist-live
+preview-dist
+screenshots
+test-results
+playwright-report
+backend/node_modules
+backend/dist
+backend/data
+backend/.env
+backend/.qseal_keys.json
+.env
+.env.local

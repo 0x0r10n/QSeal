@@ -1,76 +1,92 @@
-# QSeal Web
+# QSeal
 
-Standalone frontend for **QSeal**, a quantum-resistant AI inference platform for developers and AI agents. It has two separate experiences:
+Private, verifiable AI inference for developers and AI agents: an OpenAI-compatible gateway that can seal prompts with ML-KEM-768, signs every answer with ML-DSA-65 + Ed25519, and takes payment in USDC on Solana (x402 or prepaid keys).
 
-- **Marketing site:** `/`, `/technology`, `/security`, `/docs`, `/sign-in`
-- **Application workspace:** `/app`, `/app/new`, `/app/history`, `/app/verify`, `/app/models`, `/app/keys`, `/app/settings`
+This repository holds both halves:
 
-Stack: React 19 · TypeScript · Vite · Tailwind CSS v4 · Motion · React Three Fiber + Drei · TanStack Query · React Router.
+| Path | What |
+| --- | --- |
+| `backend/` | The gateway: Express, Solana payment verification, post-quantum receipts, prepaid keys, MCP. See [backend/README.md](backend/README.md). |
+| `/` (root) | The web app: marketing site (`/`, `/technology`, `/security`, `/docs`, `/sign-in`) and the app (`/app/*`). React 19, TypeScript, Vite, Tailwind v4, Motion, React Three Fiber. |
 
-## Getting started
+## Run it locally
 
 ```bash
-npm install
-cp .env.example .env.local   # set VITE_QSEAL_API_URL to connect a backend
-npm run dev                  # http://localhost:5173
+npm install && npm --prefix backend install
+
+# Terminal 1: gateway in development mode (free test keys, simulated payments,
+# a labelled echo engine when no model provider is set)
+npm run dev:gateway                    # http://localhost:4020
+
+# Terminal 2: web app pointed at it
+VITE_QSEAL_API_URL=http://localhost:4020 npm run dev    # http://localhost:5173
 ```
 
-| Variable | Purpose |
+In the app, open **Prepaid Keys → Create a test key**, then **New Request**. Add `GROQ_API_KEY` (or another provider) to `backend/.env` for real model output.
+
+## Tests
+
+| Command | Covers |
 | --- | --- |
-| `VITE_QSEAL_API_URL` | Backend base URL. If empty, the app runs in a clearly labelled *unconfigured* mode and makes no requests. |
-| `VITE_QSEAL_API_TIMEOUT_MS` | Request timeout (default 60000). |
-| `VITE_QSEAL_DEV_MOCKS` | `true` turns on labelled sample data, **in dev builds only**. Production builds never reach the mock code. |
+| `npm run test:backend` | 28 gateway tests: payments, replay protection, refunds, receipts (genuine, tampered, forged), sealing, MCP, persistence, log redaction, production config checks, on-chain verification against a stubbed RPC |
+| `npm test` | Web unit tests, including browser crypto checked byte-for-byte against the gateway implementation |
+| `npm run test:e2e` | Playwright on desktop and mobile, plus live journeys against a real development gateway (key purchase, sealed request, receipt verification, wallet pay-per-request) |
+| `npm run test:all` | Lint, types, and all of the above |
 
-Never put secrets in `VITE_*` variables. They are embedded in the client bundle.
+## Deploy
 
-## Scripts
+One image runs the gateway and serves the web app from the same origin:
 
-| Command | |
-| --- | --- |
-| `npm run dev` | Dev server |
-| `npm run build` | Typecheck and production build |
-| `npm run lint` | ESLint |
-| `npm test` | Unit tests (Vitest) |
-| `npm run test:e2e` | Playwright journeys on desktop and mobile (builds and previews automatically) |
-| `CAPTURE=1 npx playwright test screenshots` | Visual QA captures into `./screenshots` |
-| `node scripts/capture-scroll.mjs <url> <out-prefix> <w> <h> <mobile 0/1>` | Viewport-by-viewport scroll captures of a running server |
-| `npx vite-node scripts/favicon.ts` | Regenerate the favicon from the emblem geometry |
+```bash
+docker build -t qseal .
+docker run -p 8080:8080 -v qseal-data:/data --env-file backend/.env qseal
+```
 
-## Architecture
+`/data` holds the SQLite database (balances, receipts, spent payments) and the signing keys. **It must be persistent.** On hosts without a persistent disk, put the keys in `QSEAL_KEYS_JSON` and use a mounted volume for the database.
+
+To host the web app separately (static hosting or a CDN), build it with `VITE_QSEAL_API_URL=https://your-gateway` and set `CORS_ORIGINS` on the gateway to the app's origin.
+
+## Launch checklist
+
+The gateway refuses to start with `NODE_ENV=production` unless the first four are set.
+
+- [ ] `SOLANA_PAY_TO`: your treasury wallet. Make sure its USDC token account exists.
+- [ ] A model provider: `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, `FIREWORKS_API_KEY`, or `UPSTREAM_BASE_URL` + `UPSTREAM_API_KEY` + `UPSTREAM_MODEL_MAP`.
+- [ ] `SOLANA_RPC_URL`: a dedicated RPC (Helius, Triton, QuickNode…). The public endpoint is rate limited.
+- [ ] `ALLOW_DEV_BYPASS` unset or `false`.
+- [ ] `SOLANA_NETWORK=mainnet-beta` when you are ready for real USDC.
+- [ ] A persistent volume for `/data`, and a backup of `qseal_keys.json`. Losing or rotating the signing keys invalidates every receipt issued before.
+- [ ] HTTPS in front of the gateway, and `TRUST_PROXY=true` behind a load balancer so rate limits see real client IPs.
+- [ ] `PRICE_PER_REQUEST_USDC` and `MIN_PREPAID_DEPOSIT_USDC` set to your pricing.
+- [ ] Privacy policy and terms of service published, and linked from the site footer.
+- [ ] A security contact for vulnerability reports.
+
+## Security model in one paragraph
+
+The gateway keeps no prompts or completions (receipts hold SHA-256 hashes; the access log records method, path and status, with secrets redacted). Sealing encrypts a request from the client to the gateway with ML-KEM-768 + AES-256-GCM. The gateway decrypts it in memory and forwards it to the configured model provider, which sees the prompt under its own data policy. Receipts are signed with ML-DSA-65 and Ed25519 and verify only against the gateway's published keys. Payments are USDC on Solana, verified on-chain, usable once, and refunded or released if inference fails. There is no TEE, no end-to-end encryption to the model, and wallet signatures are classical. The site's Security page says the same.
+
+## Web app structure
 
 ```
 src/
-  app/            router + providers (Query, MotionConfig)
-  layouts/        MarketingLayout, AppLayout (separate shells)
-  routes/         marketing/* and app/* pages (lazy-loaded)
-  components/
-    brand/        QEmblem (SVG mark), Wordmark
-    marketing/    hero, 3D scene, landing sections
-    application/  sidebar, top bar, panels, state views
-    ui/           buttons, tags, code blocks, accordion, reveal
-  features/       history store, request lifecycle (Sealing Chamber)
-  services/       api/ (client, models, chat, errors, credentials, mocks), receipts
-  content/        copy for security layers, FAQ, code samples
+  app/            router, providers
+  layouts/        MarketingLayout, AppLayout
+  routes/         marketing/*, app/* (lazy-loaded)
+  components/     brand (emblem), marketing, application, ui
+  features/       request lifecycle (Sealing Chamber), local history
+  services/
+    api/          typed gateway client: chat, models, keys, payments, receipts
+    crypto/       ML-KEM sealing, ML-DSA/Ed25519 receipt verification, base58
+    wallet/       Wallet Standard connect + sign, pay-from-wallet
+  content/        security layers, FAQ, code samples (all run against the gateway)
   lib/            emblem geometry, motion tokens, env, highlighter
 ```
 
-### Emblem
+Environment for the web app:
 
-`src/lib/emblem.ts` generates the fragmented Q deterministically: a ring of vertical chrome bars, heavier on the left, that dissolves into loose cubes across the upper right, closed by a tiled diagonal blade. The same geometry drives the SVG mark (`QEmblem`, with `full` and simplified `mark` detail levels), the favicon, and the instanced 3D sculpture in the hero.
-
-The hero's WebGL scene is lazy-loaded after first paint, pauses when off-screen, and cross-fades over an SVG fallback. It is skipped when WebGL is unavailable or reduced motion is on.
-
-### Backend integration boundary
-
-All network access goes through `services/api/client.ts`, which handles timeouts, cancellation, error mapping (network/CORS, HTTP, parse) and the optional access key. Integrated contracts:
-
-- `GET /v1/models`: parsed defensively (`{ data: [...] }` or a bare array)
-- `POST /v1/chat/completions`: non-streaming; sends only `model` + `messages` plus any fields the user adds under *Advanced*
-
-Not assumed, and left as explicit extension points until their contracts are supplied:
-
-- **Receipts:** `services/receipts.ts` has `extractReceipt()` and a verifier registry. With no verifier registered, Verify reports *Unable to verify*, never *Valid*.
-- **Auth:** an optional key is held in `sessionStorage` and sent as `Authorization: Bearer …` (`services/api/credentials.ts`). Adjust once the scheme is confirmed.
-- **Solana wallet and payments, prepaid-key management, account history and usage:** the UI shows deliberate "not configured" states.
-
-Request history is a local log in this browser (`features/history/store.ts`). It holds only requests actually sent from here.
+| Variable | Purpose |
+| --- | --- |
+| `VITE_QSEAL_API_URL` | Gateway URL, or `/` when the gateway serves the app. Empty = unconnected mode, no requests. |
+| `VITE_QSEAL_API_TIMEOUT_MS` | Request timeout (default 120000). |
+| `VITE_QSEAL_DEV_MOCKS` | `true` shows labelled sample data in dev builds only, without a gateway. |
+| `VITE_ROUTER` | `hash` for static hosts without SPA fallback. |

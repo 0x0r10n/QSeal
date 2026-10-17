@@ -5,19 +5,17 @@
 
 ---
 
-## ⚡ Core Architecture & Promises
+## What it does
 
-- **OpenAI-Compatible**: Drop-in replacement for OpenAI API (`POST /v1/chat/completions`, `GET /v1/models`).
-- **Official Solana x402 V2 Protocol**: Unpaid requests return official `PAYMENT-REQUIRED` headers containing CAIP-2 network identifiers (`solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for Devnet, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` for Mainnet). Clients using `@x402/svm` or `@x402/fetch` pay and retry seamlessly.
-- **On-Chain Solana USDC Settlement**: Checks on-chain transactions, ATA (Associated Token Account) transfers, exact amounts, and enforces anti-replay protection.
-- **Live Model Routing**: Plugs directly into Groq, OpenRouter, Together, or Fireworks (via `GROQ_API_KEY`, `OPENROUTER_API_KEY`, etc.), mapping privacy models (`qseal-quantum-70b`, `qseal-deepseek-r1`) to real fast inference with dynamic model pricing.
-- **Zero Prompt Retention**: Enforced zero-logging middleware. Prompts and completions are held strictly in ephemeral RAM and never recorded to disk, database, or console.
-- **NIST Post-Quantum Cryptography**: 
-  - **ML-KEM-768** (FIPS 203 / Kyber): Asymmetric key encapsulation for client-side prompt sealing.
-  - **ML-DSA-65** (FIPS 204 / Dilithium): Cryptographically signed inference receipts.
-- **Stable Verification Key**: Published at `GET /.well-known/qseal-keys.json` and persisted in `.qseal_keys.json`.
-
----
+- **OpenAI-compatible**: `POST /v1/chat/completions`, `GET /v1/models`. Responses add a `qseal_receipt` field.
+- **x402 V2 payments on Solana**: unpaid requests get `402` with a `PAYMENT-REQUIRED` challenge (CAIP-2 network, USDC mint, treasury, reference). Payments are verified on-chain, must be recent (`MAX_PAYMENT_AGE_SEC`), and can be used once, even across restarts.
+- **Prepaid keys**: bought with a verified USDC deposit (`POST /v1/keys/prepaid`), topped up the same way, stored only as SHA-256 hashes. Balance via `GET /v1/keys/balance` with `Authorization: Bearer`.
+- **Sealed prompts**: clients may encrypt requests to the gateway with ML-KEM-768 (FIPS 203) + AES-256-GCM. The gateway decrypts in memory and forwards the prompt to the model provider.
+- **Signed receipts**: ML-DSA-65 (FIPS 204) + Ed25519 over hashes of prompt and response, model, tokens and payment. Verification checks the signatures against the gateway's published keys (`/.well-known/qseal-keys.json`).
+- **Zero prompt retention at the gateway**: no prompt or completion is stored or logged. Model providers handle prompts under their own policies.
+- **Model routing**: each QSeal model maps to a named upstream model per provider (`src/catalogue.ts`); `GET /v1/models` shows which. Provider failures are errors, never canned answers, and the charge is refunded.
+- **MCP**: `POST /mcp` with `qseal_infer` (paid like chat) and `qseal_verify_receipt`.
+- **Persistence**: SQLite via Node's built-in `node:sqlite` (Node 22.13+). No native dependencies.
 
 ## 🚀 Quick Setup & Launch
 
@@ -27,6 +25,8 @@ cd backend
 npm install
 npm run build
 ```
+
+For local development, `npm run dev` starts the gateway with `ALLOW_DEV_BYPASS=true`: free test keys (`POST /v1/keys/prepaid {"dev": true}`), simulated payments (`sim_tx_…`), and a clearly labelled echo engine when no provider is set. Production refuses to start with it enabled.
 
 ### 2. Configure Environment (`.env`)
 Create a `.env` file in `qseal/backend`:
@@ -50,9 +50,11 @@ GROQ_API_KEY=gsk_...
 # OPENROUTER_API_KEY=sk-or-...
 # TOGETHER_API_KEY=...
 
-# Developer Testing
-ALLOW_DEV_BYPASS=true
+# Never true in production
+ALLOW_DEV_BYPASS=false
 ```
+
+See `.env.example` for every option (persistence paths, CORS, proxy, pricing, custom providers).
 
 ### 3. Start Gateway
 ```bash
@@ -61,38 +63,18 @@ npm start
 
 ---
 
-## 💳 Official Solana x402 V2 Client Integration
+## 💳 Paying from code
 
-Clients using the official `@x402/fetch` and `@x402/svm` packages can call QSeal with zero custom payment code:
+Three ways, all tested:
 
-```typescript
-import { wrapFetchWithPayment } from "@x402/fetch";
-import { ExactSvmScheme } from "@x402/svm";
-import { createKeyPairSignerFromBytes } from "@solana/kit";
+1. **Prepaid key** (simplest for agents): use it as the API key with any OpenAI SDK.
+   ```ts
+   const qseal = new OpenAI({ baseURL: `${QSEAL_API_URL}/v1`, apiKey: "qseal_sk_…" })
+   ```
+2. **Pay per request**: send a USDC transfer to the treasury, then retry with its transaction signature (below).
+3. **Browser wallets**: `POST /v1/payments/prepare` returns an unsigned USDC transfer for the wallet to sign and send; the web app does this.
 
-// 1. Initialize Solana agent signer
-const signer = await createKeyPairSignerFromBytes(agentPrivateKeyBytes);
-
-// 2. Wrap standard fetch with SVM payment scheme
-const x402Fetch = wrapFetchWithPayment(fetch, [new ExactSvmScheme(signer)]);
-
-// 3. Make completion call: automatically intercepts HTTP 402,
-// broadcasts the 0.001 USDC transfer, attaches PAYMENT-SIGNATURE, and resolves!
-const response = await x402Fetch("http://localhost:4020/v1/chat/completions", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    model: "qseal-quantum-70b",
-    messages: [{ role: "user", content: "Execute confidential on-chain arbitrage" }],
-  }),
-});
-
-const data = await response.json();
-console.log(data.choices[0].message.content);
-console.log("ML-DSA-65 Receipt:", data.qseal_receipt);
-```
-
----
+> The gateway accepts the signature of a transfer that is already on-chain. Clients that instead hand over a signed-but-unsent transaction for the server to submit (as some x402 SVM client libraries do) are not supported yet.
 
 ## 💳 Standard HTTP / cURL Flow
 
@@ -115,7 +97,7 @@ X-402-Pay-Url: solana:QSeaL...?amount=0.0010&spl-token=...&reference=6VD3...
 ```bash
 curl -X POST http://localhost:4020/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "PAYMENT-SIGNATURE: <base64_encoded_payment_payload_or_tx_signature>" \
+  -H "PAYMENT-SIGNATURE: <tx signature, or base64 JSON {\"signature\": ..., \"reference\": ...}>" \
   -d '{"messages":[{"role":"user","content":"Hello QSeal"}]}'
 ```
 
@@ -137,18 +119,8 @@ QSeal generates and persists stable cryptographic keys on startup in `.qseal_key
 
 ## 🧪 Automated Test Suite
 
-Run the full production test suite:
 ```bash
 npm test
 ```
-Verifies:
-1. Health & CAIP-2 network reporting
-2. OpenAI-compatible models listing with pricing
-3. Official x402 V2 `PAYMENT-REQUIRED` headers
-4. `PAYMENT-SIGNATURE` transaction submission & `PAYMENT-RESPONSE` settlement
-5. Anti-replay prevention
-6. Stable keys at `/.well-known/qseal-keys.json`
-7. ML-DSA-65 post-quantum receipt verification
-8. In-memory ML-KEM-768 prompt sealing & decapsulation
-9. Prepaid API key quotas
-10. MCP tool execution
+
+28 tests covering: health and models; x402 challenge, payment and replay (including after a restart); refunds when the provider fails; prepaid keys (no free minting, deduction, balance by header); receipts (genuine, tampered, signed with foreign keys); sealed requests and sealed responses; MCP payment enforcement; log redaction; JSON errors; production config checks; and on-chain USDC verification (amount, mint, recipient, age, failed transactions) against a stubbed RPC.

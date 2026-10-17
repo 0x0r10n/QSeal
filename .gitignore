@@ -12,3 +12,4 @@ backend/dist
 backend/data
 backend/.env
 backend/.qseal_keys.json
+dist-live

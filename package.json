@@ -10,7 +10,10 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dev:gateway": "npm --prefix backend run dev",
+    "test:backend": "npm --prefix backend test",
+    "test:all": "npm run lint && npm run typecheck && npm test && npm run test:backend && npm run test:e2e"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
