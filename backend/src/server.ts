@@ -238,7 +238,11 @@ export function startServer(port = config.port) {
 }
 
 const isMainModule =
-  process.argv[1]?.replace(/\\/g, '/').endsWith('src/server.ts') || process.argv[1]?.replace(/\\/g, '/').endsWith('dist/server.js');
+  process.env.pm_id !== undefined ||
+  process.argv[1]?.replace(/\\/g, '/').endsWith('src/server.ts') ||
+  process.argv[1]?.replace(/\\/g, '/').endsWith('dist/server.js') ||
+  process.argv[1]?.includes('pm2') ||
+  process.argv[1]?.includes('ProcessContainer');
 
 if (isMainModule && process.env.NODE_ENV !== 'test') {
   startServer();
