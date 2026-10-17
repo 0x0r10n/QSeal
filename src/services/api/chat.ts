@@ -19,6 +19,9 @@ export async function createChatCompletion(req: ChatCompletionRequest, signal?: 
     headers['PAYMENT-SIGNATURE'] = btoa(
       JSON.stringify({ x402Version: 2, signature: req.payment.signature, ...(req.payment.reference ? { reference: req.payment.reference } : {}) }),
     )
+  } else if (req.payment.kind === 'trial') {
+    headers['X-Trial-Wallet'] = req.payment.wallet
+    headers['X-Wallet-Address'] = req.payment.wallet
   }
 
   let body: unknown = plain

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, CornerDownLeft, KeyRound, Lock, LockOpen, ScanLine, Square, Wallet } from 'lucide-react'
+import { ChevronDown, CornerDownLeft, KeyRound, Lock, LockOpen, ScanLine, Sparkles, Square, Wallet } from 'lucide-react'
 import { PageHeader, Panel, StatePanel, fieldClass } from '@/components/application/ui'
 import { WalletMenu } from '@/components/application/WalletMenu'
 import { ModelLogo } from '@/components/brand/ModelLogo'
@@ -14,6 +14,7 @@ import { historyStore, newId } from '@/features/history/store'
 import { useModels } from '@/hooks/useModels'
 import { useAccessKey } from '@/hooks/useAccessKey'
 import { useKeyBalance } from '@/hooks/useGateway'
+import { useTrialStatus } from '@/hooks/useTrialStatus'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { createChatCompletion } from '@/services/api/chat'
 import { ApiError, describeError } from '@/services/api/errors'
@@ -27,7 +28,7 @@ import { cn } from '@/lib/cn'
 import type { ChatCompletionResult, ChatMessage, Payment } from '@/types/api'
 
 type Result = { ok: true; data: ChatCompletionResult } | { ok: false; error: { title: string; detail: string }; payment?: boolean }
-type PayMethod = 'key' | 'wallet'
+type PayMethod = 'key' | 'wallet' | 'trial'
 
 const usdc = (n: number | undefined) => (n === undefined ? '—' : `${n < 0.01 ? n.toFixed(4) : n.toFixed(2)} USDC`)
 
@@ -37,6 +38,7 @@ export default function NewRequest() {
   const key = useAccessKey()
   const balance = useKeyBalance()
   const { account } = useWallet()
+  const trial = useTrialStatus(account?.address)
   const queryClient = useQueryClient()
 
   const [model, setModel] = useState('')
@@ -54,14 +56,25 @@ export default function NewRequest() {
   const [unusedPayment, setUnusedPayment] = useState<{ signature: string; reference: string; model: string } | null>(null)
   const abort = useRef<AbortController | null>(null)
 
+  const remainingTrials = trial.data?.remaining ?? (account ? 3 : 0)
+  const hasFreeTrial = Boolean(account && remainingTrials > 0)
+
   useEffect(() => {
     if (!model && models.data?.length) setModel(models.data[0].id)
   }, [models.data, model])
 
-  // Default to the prepaid key, else the connected wallet.
+  // Default to free trial if available, then prepaid key, else wallet.
   useEffect(() => {
-    setMethod((m) => (m === 'key' && key) || (m === 'wallet' && account) ? m : key ? 'key' : account ? 'wallet' : null)
-  }, [key, account])
+    setMethod((m) => {
+      if (m === 'trial' && hasFreeTrial) return 'trial'
+      if (m === 'key' && key) return 'key'
+      if (m === 'wallet' && account) return 'wallet'
+      if (hasFreeTrial) return 'trial'
+      if (key) return 'key'
+      if (account) return 'wallet'
+      return null
+    })
+  }, [key, account, hasFreeTrial])
 
   const extraParsed = useMemo((): { ok: true; value?: Record<string, unknown> } | { ok: false; msg: string } => {
     if (!extra.trim()) return { ok: true }
@@ -78,7 +91,11 @@ export default function NewRequest() {
   const price = selected?.priceUsdc
   const ready = Boolean(model && prompt.trim())
   const busy = chamber.phase === 'sending' || chamber.phase === 'paying'
-  const paymentReady = backendMode === 'mock' || (method === 'key' && key) || (method === 'wallet' && account)
+  const paymentReady =
+    backendMode === 'mock' ||
+    (method === 'trial' && hasFreeTrial) ||
+    (method === 'key' && key) ||
+    (method === 'wallet' && account)
   const canSend = ready && !busy && extraParsed.ok && backendMode !== 'unconfigured' && Boolean(paymentReady)
 
   useEffect(() => {
@@ -112,7 +129,9 @@ export default function NewRequest() {
 
     // 1. Payment
     let payment: Payment = { kind: 'key' }
-    if (method === 'wallet' && account && backendMode === 'live') {
+    if (method === 'trial' && account) {
+      payment = { kind: 'trial', wallet: account.address }
+    } else if (method === 'wallet' && account && backendMode === 'live') {
       if (unusedPayment && unusedPayment.model === model) {
         payment = { kind: 'x402', signature: unusedPayment.signature, reference: unusedPayment.reference }
       } else {
@@ -162,6 +181,7 @@ export default function NewRequest() {
         receipt: data.receipt ? { id: data.receipt.id, check: 'checking' } : null,
       })
       void queryClient.invalidateQueries({ queryKey: ['balance'] })
+      void queryClient.invalidateQueries({ queryKey: ['trial-status'] })
 
       // 3. Check the receipt's signatures right away.
       if (data.receipt) {
@@ -186,6 +206,7 @@ export default function NewRequest() {
       setResult(cancelled ? null : { ok: false, error: err, payment: paymentRefused })
       setChamber({ ...base, phase: cancelled ? 'cancelled' : 'error', startedAt, failedAt: paymentRefused ? 'payment' : 'request', errorTitle: err.title })
       void queryClient.invalidateQueries({ queryKey: ['balance'] })
+      void queryClient.invalidateQueries({ queryKey: ['trial-status'] })
     } finally {
       abort.current = null
     }
@@ -327,7 +348,50 @@ export default function NewRequest() {
           <Panel title="Payment">
             <fieldset>
               <legend className="sr-only">Payment method</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 lg:grid-cols-3 sm:grid-cols-1">
+                <label
+                  className={cn(
+                    'relative flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition overflow-hidden',
+                    method === 'trial' ? 'border-brand/40 bg-brand/[0.06] shadow-[0_0_20px_rgba(20,241,149,0.08)]' : 'border-white/[0.07] hover:border-white/15',
+                    !hasFreeTrial && 'cursor-default opacity-60',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="pay"
+                    checked={method === 'trial'}
+                    disabled={!hasFreeTrial || busy}
+                    onChange={() => setMethod('trial')}
+                    className="mt-1 accent-brand"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-1">
+                      <span className="flex items-center gap-2 text-[13.5px] font-medium text-steel-100">
+                        <Sparkles className="size-4 text-brand" /> Free Trial
+                      </span>
+                      <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-brand">
+                        {remainingTrials > 0 ? `${remainingTrials} Left` : '0 Left'}
+                      </span>
+                    </span>
+                    <span className="mt-1.5 block text-[12.5px] text-steel-400">
+                      {account ? (
+                        remainingTrials > 0 ? (
+                          <>Complimentary inference. No USDC required.</>
+                        ) : (
+                          <>All 3 trial requests used. Use a prepaid key or wallet.</>
+                        )
+                      ) : (
+                        <>Connect wallet to access 3 free requests.</>
+                      )}
+                    </span>
+                    {!account && (
+                      <span className="mt-3 block">
+                        <WalletMenu align="left" />
+                      </span>
+                    )}
+                  </span>
+                </label>
+
                 <label
                   className={cn(
                     'flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition',
@@ -355,6 +419,7 @@ export default function NewRequest() {
                     )}
                   </span>
                 </label>
+
                 <label
                   className={cn(
                     'flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition',
@@ -368,7 +433,7 @@ export default function NewRequest() {
                       <Wallet className="size-4 text-steel-400" /> Wallet, pay per request
                     </span>
                     <span className="mt-1 block text-[12.5px] text-steel-500">
-                      {account ? `${usdc(price)} USDC transfer per request, plus a small SOL network fee.` : 'Connect a Solana wallet holding USDC.'}
+                      {account ? `${usdc(price)} USDC transfer per request.` : 'Connect a Solana wallet holding USDC.'}
                     </span>
                     {!account && (
                       <span className="mt-3 block">

@@ -28,6 +28,7 @@ export interface ChatMessage {
 export type Payment =
   | { kind: 'key' } // prepaid key from the session (Authorization: Bearer)
   | { kind: 'x402'; signature: string; reference?: string } // on-chain USDC transfer
+  | { kind: 'trial'; wallet: string } // free trial request (3 free requests per wallet)
 
 export interface ChatCompletionRequest {
   model: string
@@ -60,7 +61,7 @@ export interface QSealReceipt {
   promptHash: string
   responseHash: string
   tokens: { promptTokens: number; completionTokens: number; totalTokens: number }
-  payment: { type: 'x402-solana' | 'prepaid-key' | 'dev-bypass'; reference?: string; signature?: string; amountUsdc: number }
+  payment: { type: 'x402-solana' | 'prepaid-key' | 'dev-bypass' | 'free-trial'; reference?: string; signature?: string; amountUsdc: number }
   sealed: boolean
   pqc: {
     algorithm: string

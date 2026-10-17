@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import { ButtonLink } from '@/components/ui/Button'
+import { getAppUrl } from '@/lib/domains'
 import { QEmblem } from '@/components/brand/QEmblem'
 import { LiveFacts } from './LiveFacts'
 import { useReducedMotion, useMediaQuery } from '@/hooks/useMediaQuery'
@@ -136,7 +137,7 @@ export function Hero() {
             transition={{ duration: DURATION.slow, ease: EASE, delay: 0.9 }}
             className="mt-10 flex flex-wrap items-center gap-3"
           >
-            <ButtonLink to="/app" size="lg">
+            <ButtonLink to={getAppUrl('/app')} size="lg">
               Launch App <ArrowRight className="size-4 transition-transform group-hover/btn:translate-x-0.5" />
             </ButtonLink>
             <ButtonLink to="/technology" variant="secondary" size="lg">

@@ -2,6 +2,7 @@ import { ArrowRight, BookOpen } from 'lucide-react'
 import { Container, SectionHeader } from './SectionHeader'
 import { CodeWindow } from './CodeWindow'
 import { ButtonLink } from '@/components/ui/Button'
+import { getAppUrl } from '@/lib/domains'
 import { Reveal, RevealItem } from '@/components/ui/Reveal'
 
 const STEPS = [
@@ -40,7 +41,7 @@ export function DeveloperSection() {
               ))}
             </Reveal>
             <div className="mt-10 flex flex-wrap gap-3">
-              <ButtonLink to="/app">
+              <ButtonLink to={getAppUrl('/app')}>
                 Launch App <ArrowRight className="size-4" />
               </ButtonLink>
               <ButtonLink to="/docs" variant="secondary">

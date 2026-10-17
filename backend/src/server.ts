@@ -14,6 +14,7 @@ import { handleCreatePrepaidKey, handleGetBalance, handleGetKeyBalance, handleTo
 import { handlePreparePayment } from './routes/payments.js';
 import { handleGetQuantumKeys } from './routes/quantum.js';
 import { handleMcpRequest } from './mcp/mcpServer.js';
+import { FreeTrialManager } from './payments/trials.js';
 
 const VERSION = '1.1.0';
 const app = express();
@@ -33,6 +34,10 @@ app.use(
       'X-Dev-Bypass',
       'X-QSeal-Encrypted',
       'X-QSeal-Kem',
+      'X-Trial-Wallet',
+      'X-Wallet-Address',
+      'x-trial-wallet',
+      'x-wallet-address',
       'Mcp-Session-Id',
     ],
     exposedHeaders: [
@@ -54,6 +59,8 @@ app.use(
       'X-QSeal-Prompt-Hash',
       'X-QSeal-Response-Hash',
       'X-QSeal-Sealed',
+      'X-Trial-Remaining',
+      'x-trial-remaining',
     ],
   }),
 );
@@ -122,6 +129,19 @@ api.post('/v1/payments/prepare', strict, handlePreparePayment);
 api.get('/v1/quantum-keys', reads, handleGetQuantumKeys);
 api.get('/.well-known/qseal-keys.json', reads, handleGetQuantumKeys);
 
+// Free trial status
+api.get('/v1/trial/status', reads, (req: Request, res: Response) => {
+  const identifier = ((req.query.wallet as string) || (req.headers['x-trial-wallet'] as string) || (req.headers['x-wallet-address'] as string) || '').trim();
+  const status = FreeTrialManager.getTrial(identifier);
+  res.setHeader('X-Trial-Remaining', String(status.remaining));
+  res.json({
+    identifier: identifier || 'anonymous',
+    remaining: status.remaining,
+    used: status.used,
+    total: status.total,
+  });
+});
+
 // MCP (JSON-RPC over HTTP)
 api.post('/mcp', strict, handleMcpRequest);
 
@@ -129,7 +149,7 @@ api.get('/health', reads, (_req: Request, res: Response) => {
   const keys = pqc.getPublicKeys();
   res.status(200).json({
     status: 'healthy',
-    service: 'QSeal Gateway',
+    service: 'QRouter Gateway',
     version: VERSION,
     mode: config.allowDevBypass ? 'development' : 'production',
     solana: {

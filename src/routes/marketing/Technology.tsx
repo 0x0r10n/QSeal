@@ -4,6 +4,7 @@ import { ArchitectureDiagram } from '@/components/marketing/ArchitectureDiagram'
 import { Container } from '@/components/marketing/SectionHeader'
 import { CodeWindow } from '@/components/marketing/CodeWindow'
 import { ButtonLink } from '@/components/ui/Button'
+import { getAppUrl } from '@/lib/domains'
 import { AvailabilityTag } from '@/components/ui/StatusTag'
 import { Reveal, RevealItem } from '@/components/ui/Reveal'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
@@ -38,7 +39,7 @@ export default function Technology() {
         }
         lede="An OpenAI-compatible gateway that seals prompts with ML-KEM-768, signs every answer with ML-DSA-65, and takes payment in USDC on Solana."
       >
-        <ButtonLink to="/app">
+        <ButtonLink to={getAppUrl('/app')}>
           Launch App <ArrowRight className="size-4" />
         </ButtonLink>
       </PageHero>

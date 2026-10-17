@@ -5,6 +5,7 @@ import { ArrowRight, Menu, X } from 'lucide-react'
 import { Wordmark } from '@/components/brand/QEmblem'
 import { XLogo } from '@/components/brand/XLogo'
 import { ButtonLink } from '@/components/ui/Button'
+import { getAppUrl } from '@/lib/domains'
 import { EASE } from '@/lib/motion'
 import { cn } from '@/lib/cn'
 
@@ -88,7 +89,7 @@ export function Nav() {
               <XLogo size={14} className="transition-transform duration-300 group-hover/x:scale-110" />
             </a>
             <span className="hidden sm:block">
-              <ButtonLink to="/app" size="sm" className="h-9 px-4">
+              <ButtonLink to={getAppUrl('/app')} size="sm" className="h-9 px-4">
                 Launch App <ArrowRight className="size-3.5" />
               </ButtonLink>
             </span>
@@ -147,7 +148,7 @@ export function Nav() {
                 <XLogo size={16} />
                 <span>Follow @QRouter_ on X</span>
               </a>
-              <ButtonLink to="/app" size="lg" className="w-full">
+              <ButtonLink to={getAppUrl('/app')} size="lg" className="w-full">
                 Launch App <ArrowRight className="size-4" />
               </ButtonLink>
             </motion.div>

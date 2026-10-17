@@ -46,20 +46,20 @@ export default function SignIn() {
   const activeError = connectErr || globalError
 
   return (
-    <section className="grain relative isolate flex min-h-[100svh] items-center justify-center overflow-hidden px-5 pb-20 pt-28">
+    <section className="grain relative isolate flex min-h-[100svh] items-center justify-center overflow-hidden px-5 py-16 sm:py-20">
       <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,#1a1a1f,#060607_70%)]" />
       <div aria-hidden className="pinstripes mask-radial absolute inset-0 -z-10" />
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 1, ease: EASE }}
-        className="surface-raised w-full max-w-[440px] rounded-[28px] p-8 sm:p-10"
+        className="surface-raised w-full max-w-[420px] rounded-[24px] p-6 sm:p-7"
       >
-        <QEmblem className="h-12 w-auto" />
-        <h1 className="mt-8 text-3xl font-semibold tracking-[-0.04em] text-steel-50">Sign in to QRouter</h1>
-        <p className="mt-2 text-[15px] text-steel-400">Connect a wallet, or continue with a prepaid key.</p>
+        <QEmblem className="h-10 w-auto" />
+        <h1 className="mt-5 text-2xl font-semibold tracking-[-0.03em] text-steel-50 sm:text-[26px]">Sign in to QRouter</h1>
+        <p className="mt-1.5 text-[14px] text-steel-400">Connect a wallet, or continue with a prepaid key.</p>
 
-        <div className="mt-8 space-y-3">
+        <div className="mt-6 space-y-2.5">
           {/* Direct connect button if Phantom is found */}
           {phantomWallet ? (
             <button
@@ -144,7 +144,7 @@ export default function SignIn() {
           </p>
         </div>
 
-        <div className="my-7 flex items-center gap-4 text-xs text-steel-600">
+        <div className="my-5 flex items-center gap-4 text-xs text-steel-600">
           <span className="h-px flex-1 bg-white/[0.07]" /> or <span className="h-px flex-1 bg-white/[0.07]" />
         </div>
 
@@ -168,15 +168,15 @@ export default function SignIn() {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="Paste your prepaid key"
-            className="mt-2.5 h-12 w-full rounded-xl border border-white/10 bg-ink-950/60 px-4 font-mono text-sm text-steel-50 placeholder:text-steel-600 focus:border-white/30 focus:outline-none"
+            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-ink-950/60 px-4 font-mono text-sm text-steel-50 placeholder:text-steel-600 focus:border-white/30 focus:outline-none"
           />
           {key && !looksLikeKey(key) && (
-            <p className="mt-2 text-xs text-bad">Key format invalid. Enter a valid prepaid key or connect a wallet above.</p>
+            <p className="mt-1.5 text-xs text-bad">Key format invalid. Enter a valid prepaid key or connect a wallet above.</p>
           )}
-          <p className="mt-2 text-xs leading-relaxed text-steel-600">
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-steel-600">
             Saved securely for this session and sent to the gateway as authorization.
           </p>
-          <Button type="submit" size="lg" disabled={!looksLikeKey(key)} className="mt-6 w-full">
+          <Button type="submit" size="lg" disabled={!looksLikeKey(key)} className="mt-4 w-full">
             Continue with key <ArrowRight className="size-4" />
           </Button>
         </form>

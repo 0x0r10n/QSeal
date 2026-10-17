@@ -25,7 +25,7 @@ export interface HistoryEntry {
   receipt?: QSealReceipt | null
   receiptCheck?: 'valid' | 'invalid' | 'unable'
   sealed?: boolean
-  payment?: 'key' | 'wallet'
+  payment?: 'key' | 'wallet' | 'trial'
   paymentSignature?: string
   priceUsdc?: number
   sample?: boolean

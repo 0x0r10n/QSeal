@@ -40,6 +40,14 @@ export function getDb(): DatabaseSync {
       body       TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS free_trials (
+      identifier   TEXT PRIMARY KEY,
+      used_count   INTEGER NOT NULL DEFAULT 0,
+      max_trials   INTEGER NOT NULL DEFAULT 3,
+      created_at   TEXT NOT NULL,
+      last_used_at TEXT NOT NULL
+    );
   `);
   return db;
 }

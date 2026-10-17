@@ -12,7 +12,7 @@ export type Phase = 'idle' | 'paying' | 'sending' | 'done' | 'error' | 'cancelle
 export interface ChamberState {
   phase: Phase
   ready: boolean
-  paymentMethod: 'key' | 'wallet' | null
+  paymentMethod: 'key' | 'wallet' | 'trial' | null
   payStage?: PayStage
   /** Phase in which an error happened. */
   failedAt?: 'payment' | 'request'
@@ -66,9 +66,11 @@ export function SealingChamber({ s }: { s: ChamberState }) {
           : s.failedAt === 'payment' ? s.errorTitle
             : started && s.paymentMethod === 'key' ? 'Charged to your prepaid key by the gateway'
               : started && s.paymentMethod === 'wallet' ? 'USDC transfer signed from your wallet'
-                : s.paymentMethod === 'key' ? 'Prepaid key'
-                  : s.paymentMethod === 'wallet' ? 'Wallet, pay per request'
-                    : 'Choose how to pay',
+                : started && s.paymentMethod === 'trial' ? 'Free trial request (no payment required)'
+                  : s.paymentMethod === 'key' ? 'Prepaid key'
+                    : s.paymentMethod === 'wallet' ? 'Wallet, pay per request'
+                      : s.paymentMethod === 'trial' ? 'Free trial (3 requests)'
+                        : 'Choose how to pay',
     },
     {
       label: s.sealed ? 'Sealed and dispatched' : 'Dispatched',

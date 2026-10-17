@@ -15,7 +15,7 @@ export interface QSealReceiptData {
     totalTokens: number;
   };
   payment: {
-    type: 'x402-solana' | 'prepaid-key' | 'dev-bypass';
+    type: 'x402-solana' | 'prepaid-key' | 'dev-bypass' | 'free-trial';
     reference?: string;
     signature?: string;
     amountUsdc: number;

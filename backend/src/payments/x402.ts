@@ -3,6 +3,7 @@ import { Keypair } from '@solana/web3.js';
 import { config } from '../config.js';
 import { solanaVerifier, PaymentVerificationResult } from './solana.js';
 import { PrepaidKeyManager, isPrepaidKey } from './prepaid.js';
+import { FreeTrialManager } from './trials.js';
 import { priceFor } from '../catalogue.js';
 
 export interface X402V2PaymentRequired {
@@ -127,6 +128,11 @@ export class X402Manager {
     const b64 = Buffer.from(JSON.stringify(settlementPayload)).toString('base64');
     res.setHeader('PAYMENT-RESPONSE', b64);
     res.setHeader('payment-response', b64);
+    if (result.type === 'free-trial' && result.payer) {
+      const trial = FreeTrialManager.getTrial(result.payer);
+      res.setHeader('X-Trial-Remaining', String(trial.remaining));
+      res.setHeader('x-trial-remaining', String(trial.remaining));
+    }
   }
 
   /**
@@ -158,8 +164,8 @@ export class X402Manager {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.slice(7).trim();
 
-      // Check if it's a prepaid API key (qseal_sk_...)
-      if (token.startsWith('qseal_sk_')) {
+      // Check if it's a prepaid API key (qseal_sk_... or qrouter_sk_...)
+      if (token.startsWith('qseal_sk_') || token.startsWith('qrouter_sk_')) {
         const deductResult = isPrepaidKey(token)
           ? PrepaidKeyManager.deduct(token, priceUsdc)
           : { success: false, error: 'Invalid API key' };
@@ -198,7 +204,21 @@ export class X402Manager {
       return solanaVerifier.verifyPayment(paymentSigHeader, paymentRefHeader, priceUsdc);
     }
 
-    // 4. Check dev bypass in dev/test mode
+    // 4. Check if user is using one of their 3 free trials (per wallet address)
+    const trialWallet = (req.headers['x-trial-wallet'] || req.headers['x-wallet-address']) as string | undefined;
+    if (trialWallet && trialWallet.trim().length >= 32) {
+      const trial = FreeTrialManager.consume(trialWallet);
+      if (trial.success) {
+        return {
+          verified: true,
+          type: 'free-trial',
+          amountUsdc: 0,
+          payer: trialWallet.trim(),
+        };
+      }
+    }
+
+    // 5. Check dev bypass in dev/test mode
     const devBypassHeader = req.headers['x-dev-bypass'] as string | undefined;
     if (config.allowDevBypass && devBypassHeader === 'true') {
       return {

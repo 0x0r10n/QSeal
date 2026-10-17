@@ -9,7 +9,7 @@ import { getDb, toMicro } from '../store/db.js';
 
 export interface PaymentVerificationResult {
   verified: boolean;
-  type: 'x402-solana' | 'prepaid-key' | 'dev-bypass';
+  type: 'x402-solana' | 'prepaid-key' | 'dev-bypass' | 'free-trial';
   signature?: string;
   reference?: string;
   amountUsdc: number;

@@ -11,7 +11,11 @@ function normaliseUrl(raw: string | undefined): string | null {
   }
 }
 
-const rawUrl = (import.meta.env.VITE_QROUTER_API_URL || import.meta.env.VITE_QSEAL_API_URL) as string | undefined
+const defaultApiUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? (import.meta.env.VITE_QROUTER_API_URL || import.meta.env.VITE_QSEAL_API_URL || 'https://api.qrouter.cloud')
+  : 'https://api.qrouter.cloud'
+
+const rawUrl = (import.meta.env.VITE_QROUTER_API_URL || import.meta.env.VITE_QSEAL_API_URL || defaultApiUrl) as string | undefined
 
 export const env = {
   apiUrl: normaliseUrl(rawUrl),

@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowRight } from 'lucide-react'
 import { ButtonLink } from '@/components/ui/Button'
+import { getAppUrl } from '@/lib/domains'
 import { QEmblem } from '@/components/brand/QEmblem'
 import { useReducedMotion } from '@/hooks/useMediaQuery'
 
@@ -28,7 +29,7 @@ export function FinalCta() {
           Open the app, pick a model, and send your first request in under a minute.
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
-          <ButtonLink to="/app" size="lg">
+          <ButtonLink to={getAppUrl('/app')} size="lg">
             Launch App <ArrowRight className="size-4" />
           </ButtonLink>
           <ButtonLink to="/docs" size="lg" variant="secondary">

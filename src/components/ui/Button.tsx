@@ -1,6 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { Link, type LinkProps } from 'react-router-dom'
-
 import { buttonClass, type Variant, type Size } from './buttonStyles'
 
 function Sheen({ variant }: { variant: Variant }) {
@@ -30,15 +29,28 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   )
 })
 
-interface ButtonLinkProps extends LinkProps {
+interface ButtonLinkProps extends Omit<LinkProps, 'to'> {
+  to: string
   variant?: Variant
   size?: Size
   children: ReactNode
 }
 
-export function ButtonLink({ variant = 'primary', size = 'md', className, children, ...rest }: ButtonLinkProps) {
+export function ButtonLink({ variant = 'primary', size = 'md', className, children, to, ...rest }: ButtonLinkProps) {
+  const isExternal = typeof to === 'string' && /^https?:\/\//i.test(to)
+  const classes = buttonClass(variant, size, typeof className === 'string' ? className : undefined)
+
+  if (isExternal) {
+    return (
+      <a href={to} className={classes} {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>
+        <Sheen variant={variant} />
+        <span className="relative inline-flex items-center gap-2">{children}</span>
+      </a>
+    )
+  }
+
   return (
-    <Link className={buttonClass(variant, size, typeof className === 'string' ? className : undefined)} {...rest}>
+    <Link to={to} className={classes} {...rest}>
       <Sheen variant={variant} />
       <span className="relative inline-flex items-center gap-2">{children}</span>
     </Link>
