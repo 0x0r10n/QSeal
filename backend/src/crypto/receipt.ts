@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 import { pqc, GatewayPublicKeys } from './pqc.js';
+import { getDb } from '../store/db.js';
 
 export interface QSealReceiptData {
   id: string;
-  version: '1.0';
+  version: '1.0' | '2';
   timestamp: string;
   model: string;
   promptHash: string;
@@ -32,14 +33,39 @@ export interface QSealReceipt extends QSealReceiptData {
   };
 }
 
-// In-memory minimal receipt store (hashes and proof only, NEVER prompts)
-const receiptStore = new Map<string, QSealReceipt>();
+export interface ReceiptVerification {
+  valid: boolean;
+  mlDsaValid: boolean;
+  ed25519Valid: boolean;
+  /** The receipt names this gateway's published keys. */
+  signerMatchesGateway: boolean;
+  reason: string;
+}
+
+type PaymentType = QSealReceiptData['payment']['type'];
 
 export class ReceiptManager {
   /**
-   * Produce a canonical string representation for cryptographic signing
+   * The exact bytes that are signed.
+   *
+   * v2 (current) is a JSON array, so no field value can be confused with a
+   * separator. v1 (pipe-joined) is still accepted for receipts issued before.
    */
   public static canonicalString(data: QSealReceiptData): string {
+    if (data.version === '2') {
+      return JSON.stringify([
+        'qseal-receipt',
+        data.version,
+        data.id,
+        data.timestamp,
+        data.model,
+        data.promptHash,
+        data.responseHash,
+        [data.tokens.promptTokens, data.tokens.completionTokens, data.tokens.totalTokens],
+        [data.payment.type, data.payment.reference ?? null, data.payment.signature ?? null, data.payment.amountUsdc],
+        data.sealed,
+      ]);
+    }
     return [
       `id:${data.id}`,
       `version:${data.version}`,
@@ -53,74 +79,70 @@ export class ReceiptManager {
     ].join('|');
   }
 
-  /**
-   * Create, sign and store an immutable post-quantum inference receipt
-   */
+  /** Create, sign and store a receipt. Only hashes are kept, never prompt text. */
   public static create(
     model: string,
     promptHash: string,
     responseHash: string,
     tokens: { promptTokens: number; completionTokens: number; totalTokens: number },
-    payment: { type: 'x402-solana' | 'prepaid-key' | 'dev-bypass'; reference?: string; signature?: string; amountUsdc: number },
-    sealed: boolean = false
+    payment: { type: PaymentType; reference?: string; signature?: string; amountUsdc: number },
+    sealed: boolean = false,
   ): QSealReceipt {
-    const id = `rcpt_${crypto.randomUUID().replace(/-/g, '')}`;
-    const timestamp = new Date().toISOString();
-
     const data: QSealReceiptData = {
-      id,
-      version: '1.0',
-      timestamp,
+      id: `rcpt_${crypto.randomUUID().replace(/-/g, '')}`,
+      version: '2',
+      timestamp: new Date().toISOString(),
       model,
       promptHash,
       responseHash,
       tokens,
-      payment,
+      payment: {
+        type: payment.type,
+        ...(payment.reference ? { reference: payment.reference } : {}),
+        ...(payment.signature ? { signature: payment.signature } : {}),
+        amountUsdc: payment.amountUsdc,
+      },
       sealed,
     };
 
-    const canonical = this.canonicalString(data);
-    const sig = pqc.sign(canonical);
-    const publicKeys: GatewayPublicKeys = pqc.getPublicKeys();
-
+    const sig = pqc.sign(this.canonicalString(data));
+    const keys: GatewayPublicKeys = pqc.getPublicKeys();
     const receipt: QSealReceipt = {
       ...data,
       pqc: {
         algorithm: 'ML-DSA-65/Ed25519-Hybrid',
-        mlDsaPublicKey: publicKeys.mlDsaPublicKey,
-        ed25519PublicKey: publicKeys.ed25519PublicKey,
+        mlDsaPublicKey: keys.mlDsaPublicKey,
+        ed25519PublicKey: keys.ed25519PublicKey,
         mlDsaSignature: sig.mlDsaSignature,
         ed25519Signature: sig.ed25519Signature,
       },
     };
 
-    // Store receipt metadata (capped at last 10,000 to keep memory small)
-    if (receiptStore.size > 10000) {
-      const oldestKey = receiptStore.keys().next().value;
-      if (oldestKey) receiptStore.delete(oldestKey);
-    }
-    receiptStore.set(id, receipt);
-
+    getDb()
+      .prepare('INSERT INTO receipts (id, body, created_at) VALUES (?, ?, ?)')
+      .run(receipt.id, JSON.stringify(receipt), receipt.timestamp);
     return receipt;
   }
 
-  /**
-   * Retrieve receipt by ID
-   */
   public static get(id: string): QSealReceipt | undefined {
-    return receiptStore.get(id);
+    const row = getDb().prepare('SELECT body FROM receipts WHERE id = ?').get(id) as { body: string } | undefined;
+    return row ? (JSON.parse(row.body) as QSealReceipt) : undefined;
   }
 
   /**
-   * Verify receipt cryptographic validity
+   * Verify both signatures AND that the receipt was signed by this gateway.
+   * Checking against the keys embedded in the receipt alone would accept a
+   * receipt anyone signed with their own keys.
    */
-  public static verify(receipt: QSealReceipt): {
-    valid: boolean;
-    mlDsaValid: boolean;
-    ed25519Valid: boolean;
-    reason?: string;
-  } {
+  public static verify(receipt: QSealReceipt): ReceiptVerification {
     try {
+      if (!receipt?.pqc || (receipt.version !== '1.0' && receipt.version !== '2')) {
+        return { valid: false, mlDsaValid: false, ed25519Valid: false, signerMatchesGateway: false, reason: 'Unsupported receipt format' };
+      }
+      const keys = pqc.getPublicKeys();
+      const signerMatchesGateway =
+        receipt.pqc.mlDsaPublicKey === keys.mlDsaPublicKey && receipt.pqc.ed25519PublicKey === keys.ed25519PublicKey;
+
       const data: QSealReceiptData = {
         id: receipt.id,
         version: receipt.version,
@@ -132,43 +154,30 @@ export class ReceiptManager {
         payment: receipt.payment,
         sealed: receipt.sealed,
       };
-
       const canonical = this.canonicalString(data);
-
-      const mlDsaValid = pqc.verify(
-        canonical,
-        receipt.pqc.mlDsaSignature,
-        receipt.pqc.mlDsaPublicKey
-      );
-
-      const ed25519Valid = pqc.verifyEd25519(
-        canonical,
-        receipt.pqc.ed25519Signature,
-        receipt.pqc.ed25519PublicKey
-      );
+      // Always check against the gateway's own keys.
+      const mlDsaValid = pqc.verify(canonical, receipt.pqc.mlDsaSignature, keys.mlDsaPublicKey);
+      const ed25519Valid = pqc.verifyEd25519(canonical, receipt.pqc.ed25519Signature, keys.ed25519PublicKey);
+      const valid = signerMatchesGateway && mlDsaValid && ed25519Valid;
 
       return {
-        valid: mlDsaValid && ed25519Valid,
+        valid,
         mlDsaValid,
         ed25519Valid,
-        reason: mlDsaValid && ed25519Valid ? 'All cryptographic signatures valid' : 'Signature verification failed',
+        signerMatchesGateway,
+        reason: valid
+          ? 'Both signatures are valid and were made with this gateway’s published keys'
+          : !signerMatchesGateway
+            ? 'Receipt was not signed with this gateway’s published keys'
+            : 'Signature verification failed: the receipt was altered or is not genuine',
       };
     } catch (err: any) {
-      return {
-        valid: false,
-        mlDsaValid: false,
-        ed25519Valid: false,
-        reason: err?.message || 'Verification exception',
-      };
+      return { valid: false, mlDsaValid: false, ed25519Valid: false, signerMatchesGateway: false, reason: err?.message || 'Verification error' };
     }
   }
 
-  /**
-   * Export all recent receipts count/stats
-   */
   public static getStats() {
-    return {
-      totalReceiptsIssued: receiptStore.size,
-    };
+    const row = getDb().prepare('SELECT COUNT(*) AS n FROM receipts').get() as { n: number };
+    return { totalReceiptsIssued: Number(row.n) };
   }
 }

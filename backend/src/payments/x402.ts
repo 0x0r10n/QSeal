@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import { Keypair } from '@solana/web3.js';
 import { config } from '../config.js';
 import { solanaVerifier, PaymentVerificationResult } from './solana.js';
-import { PrepaidKeyManager } from './prepaid.js';
+import { PrepaidKeyManager, isPrepaidKey } from './prepaid.js';
+import { priceFor } from '../catalogue.js';
 
 export interface X402V2PaymentRequired {
   x402Version: 2;
@@ -34,7 +35,7 @@ export class X402Manager {
    * Generate an official x402 V2 payment challenge for an unpaid request
    */
   public static generateChallenge(modelName?: string): X402V2PaymentRequired {
-    const priceUsdc = (modelName && config.modelPricing[modelName]) ? config.modelPricing[modelName] : config.pricePerRequestUsdc;
+    const priceUsdc = priceFor(modelName || config.defaultModel);
     const priceStr = `$${priceUsdc.toFixed(priceUsdc < 0.01 ? 4 : 2)}`;
 
     // Fresh unique reference keypair for Solana Pay / anti-replay matching
@@ -77,7 +78,7 @@ export class X402Manager {
   /**
    * Send HTTP 402 Payment Required response conforming to official Solana x402 V2
    */
-  public static send402Response(res: Response, challenge: X402V2PaymentRequired) {
+  public static send402Response(res: Response, challenge: X402V2PaymentRequired, reason?: string) {
     const accept = challenge.accepts[0];
     const base64Challenge = Buffer.from(JSON.stringify(challenge)).toString('base64');
 
@@ -102,6 +103,7 @@ export class X402Manager {
       x402Version: 2,
       error: {
         message: `Payment Required (x402). Pay ${accept.price} USDC on Solana (${accept.network}) to proceed.`,
+        ...(reason && reason !== 'No payment proof provided' ? { reason } : {}),
         type: 'payment_required',
         code: 402,
         x402: challenge,
@@ -140,7 +142,7 @@ export class X402Manager {
     req: Request,
     modelName?: string
   ): Promise<PaymentVerificationResult> {
-    const priceUsdc = (modelName && config.modelPricing[modelName]) ? config.modelPricing[modelName] : config.pricePerRequestUsdc;
+    const priceUsdc = priceFor(modelName || config.defaultModel);
 
     // 1. Check official x402 V2 PAYMENT-SIGNATURE / payment-signature header
     const x402SigHeader = (req.headers['payment-signature'] || req.headers['PAYMENT-SIGNATURE']) as string | undefined;
@@ -158,7 +160,9 @@ export class X402Manager {
 
       // Check if it's a prepaid API key (qseal_sk_...)
       if (token.startsWith('qseal_sk_')) {
-        const deductResult = PrepaidKeyManager.deduct(token, priceUsdc);
+        const deductResult = isPrepaidKey(token)
+          ? PrepaidKeyManager.deduct(token, priceUsdc)
+          : { success: false, error: 'Invalid API key' };
         if (deductResult.success) {
           const keyInfo = PrepaidKeyManager.getKey(token);
           return {
@@ -166,6 +170,7 @@ export class X402Manager {
             type: 'prepaid-key',
             amountUsdc: priceUsdc,
             payer: keyInfo?.walletAddress,
+            refund: () => PrepaidKeyManager.refund(token, priceUsdc),
           };
         } else {
           return {
@@ -195,7 +200,7 @@ export class X402Manager {
 
     // 4. Check dev bypass in dev/test mode
     const devBypassHeader = req.headers['x-dev-bypass'] as string | undefined;
-    if (config.allowDevBypass && (devBypassHeader === 'true' || req.query['dev_bypass'] === 'true')) {
+    if (config.allowDevBypass && devBypassHeader === 'true') {
       return {
         verified: true,
         type: 'dev-bypass',

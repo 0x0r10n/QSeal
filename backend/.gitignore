@@ -4,3 +4,4 @@ dist/
 .qseal_keys.json
 *.log
 .DS_Store
+data/

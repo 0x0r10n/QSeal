@@ -1,139 +1,110 @@
 import { Request, Response } from 'express';
-import { ModelRouter } from '../router/modelRouter.js';
+import { ModelRouter, UpstreamError } from '../router/modelRouter.js';
 import { ReceiptManager } from '../crypto/receipt.js';
 import { PromptSealer } from '../crypto/seal.js';
+import { X402Manager } from '../payments/x402.js';
+import { config } from '../config.js';
+import { validateChatBody } from '../routes/validate.js';
 
 export const MCP_TOOLS = [
   {
     name: 'qseal_infer',
-    description: 'Execute a private, quantum-sealed LLM inference with zero prompt retention and signed ML-DSA-65 receipt.',
+    description:
+      'Run a private LLM inference through QSeal with a signed ML-DSA-65 receipt. Requires payment: an Authorization: Bearer prepaid key or an x402 PAYMENT-SIGNATURE header on the MCP request.',
     inputSchema: {
       type: 'object',
       properties: {
-        prompt: {
-          type: 'string',
-          description: 'The prompt or query for the private AI model',
-        },
-        model: {
-          type: 'string',
-          description: 'Model identifier (default: qseal-quantum-70b)',
-          default: 'qseal-quantum-70b',
-        },
+        prompt: { type: 'string', description: 'The prompt for the model' },
+        model: { type: 'string', description: `Model identifier (default: ${config.defaultModel})` },
       },
       required: ['prompt'],
     },
   },
   {
     name: 'qseal_verify_receipt',
-    description: 'Verify the cryptographic authenticity and ML-DSA-65 post-quantum signature of a QSeal inference receipt.',
+    description: 'Verify a QSeal receipt against this gateway’s published ML-DSA-65 and Ed25519 keys.',
     inputSchema: {
       type: 'object',
-      properties: {
-        receipt_id: {
-          type: 'string',
-          description: 'The unique receipt ID (rcpt_...) to verify',
-        },
-      },
+      properties: { receipt_id: { type: 'string', description: 'Receipt ID (rcpt_...)' } },
       required: ['receipt_id'],
     },
   },
 ];
 
-export async function handleMcpRequest(req: Request, res: Response) {
-  const { method, params, id } = req.body;
+const rpc = (res: Response, id: unknown, payload: { result?: unknown; error?: { code: number; message: string; data?: unknown } }) =>
+  res.status(200).json({ jsonrpc: '2.0', id: id ?? null, ...payload });
 
-  if (method === 'tools/list') {
-    return res.status(200).json({
-      jsonrpc: '2.0',
-      id: id || 1,
+const toolText = (res: Response, id: unknown, text: string, isError = false, extra: Record<string, unknown> = {}) =>
+  rpc(res, id, { result: { content: [{ type: 'text', text }], ...(isError ? { isError: true } : {}), ...extra } });
+
+export async function handleMcpRequest(req: Request, res: Response) {
+  const { method, params, id } = req.body ?? {};
+
+  if (method === 'initialize') {
+    return rpc(res, id, {
       result: {
-        tools: MCP_TOOLS,
+        protocolVersion: params?.protocolVersion || '2025-03-26',
+        capabilities: { tools: {} },
+        serverInfo: { name: 'qseal', version: '1.1.0' },
       },
     });
   }
+  if (method === 'notifications/initialized') return res.status(202).end();
+  if (method === 'tools/list') return rpc(res, id, { result: { tools: MCP_TOOLS } });
 
   if (method === 'tools/call') {
     const toolName = params?.name;
     const args = params?.arguments || {};
 
     if (toolName === 'qseal_infer') {
-      const prompt = args.prompt;
-      const model = args.model || 'qseal-quantum-70b';
-      const promptHash = PromptSealer.hashContent(prompt);
+      if (typeof args.prompt !== 'string' || !args.prompt) return toolText(res, id, 'prompt is required', true);
+      const v = validateChatBody({ model: args.model, messages: [{ role: 'user', content: args.prompt }] });
+      if (!v.ok) return toolText(res, id, v.message, true);
+      const model = v.request.model;
 
-      const { response, content } = await ModelRouter.execute({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      const responseHash = PromptSealer.hashContent(content);
-      const receipt = ReceiptManager.create(
-        model,
-        promptHash,
-        responseHash,
-        {
-          promptTokens: response.usage.prompt_tokens,
-          completionTokens: response.usage.completion_tokens,
-          totalTokens: response.usage.total_tokens,
-        },
-        { type: 'dev-bypass', amountUsdc: 0.001 },
-        false
-      );
-
-      return res.status(200).json({
-        jsonrpc: '2.0',
-        id: id || 1,
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: content,
-            },
-          ],
-          qseal_receipt: receipt,
-        },
-      });
-    }
-
-    if (toolName === 'qseal_verify_receipt') {
-      const receiptId = args.receipt_id;
-      const receipt = ReceiptManager.get(receiptId);
-      if (!receipt) {
-        return res.status(200).json({
-          jsonrpc: '2.0',
-          id: id || 1,
-          result: {
-            isError: true,
-            content: [{ type: 'text', text: `Receipt not found: ${receiptId}` }],
+      const payment = await X402Manager.authenticateRequest(req, model);
+      if (!payment.verified) {
+        const challenge = X402Manager.generateChallenge(model);
+        return rpc(res, id, {
+          error: {
+            code: 402,
+            message: payment.error && payment.error !== 'No payment proof provided'
+              ? `Payment required: ${payment.error}`
+              : 'Payment required: send a prepaid key (Authorization: Bearer qseal_sk_…) or an x402 PAYMENT-SIGNATURE header',
+            data: { x402: challenge },
           },
         });
       }
 
-      const verification = ReceiptManager.verify(receipt);
-      return res.status(200).json({
-        jsonrpc: '2.0',
-        id: id || 1,
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ receipt_id: receipt.id, verification }, null, 2),
-            },
-          ],
-        },
-      });
+      try {
+        const { response, content } = await ModelRouter.execute(v.request);
+        const receipt = ReceiptManager.create(
+          model,
+          PromptSealer.hashContent(v.request.messages),
+          PromptSealer.hashContent(content),
+          {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          },
+          { type: payment.type, reference: payment.reference, signature: payment.signature, amountUsdc: payment.amountUsdc },
+          false,
+        );
+        return toolText(res, id, content, false, { qseal_receipt: receipt });
+      } catch (err: any) {
+        payment.refund?.();
+        return toolText(res, id, `${err instanceof UpstreamError ? err.message : 'Inference failed'}. You were not charged.`, true);
+      }
     }
 
-    return res.status(404).json({
-      jsonrpc: '2.0',
-      id: id || 1,
-      error: { code: -32601, message: `Method or tool not found: ${toolName}` },
-    });
+    if (toolName === 'qseal_verify_receipt') {
+      const receipt = typeof args.receipt_id === 'string' ? ReceiptManager.get(args.receipt_id) : undefined;
+      if (!receipt) return toolText(res, id, `Receipt not found: ${args.receipt_id}`, true);
+      return toolText(res, id, JSON.stringify({ receipt_id: receipt.id, verification: ReceiptManager.verify(receipt) }, null, 2));
+    }
+
+    return rpc(res, id, { error: { code: -32601, message: `Tool not found: ${toolName}` } });
   }
 
-  return res.status(400).json({
-    jsonrpc: '2.0',
-    id: id || 1,
-    error: { code: -32600, message: 'Invalid MCP Request' },
-  });
+  return rpc(res, id, { error: { code: -32601, message: `Method not found: ${String(method)}` } });
 }

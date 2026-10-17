@@ -1,40 +1,43 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { config } from './config.js';
+import fs from 'fs';
+import path from 'path';
+import { config, hasUpstream, validateProductionConfig } from './config.js';
 import { pqc } from './crypto/pqc.js';
 import { solanaVerifier } from './payments/solana.js';
+import { getDb } from './store/db.js';
+import { priceFor } from './catalogue.js';
 import { handleChatCompletions } from './routes/chat.js';
 import { handleListModels } from './routes/models.js';
 import { handleGetReceipt, handleVerifyReceipt, handleReceiptStats } from './routes/receipts.js';
-import { handleCreatePrepaidKey, handleGetKeyBalance } from './routes/keys.js';
+import { handleCreatePrepaidKey, handleGetBalance, handleGetKeyBalance, handleTopUpKey } from './routes/keys.js';
+import { handlePreparePayment } from './routes/payments.js';
 import { handleGetQuantumKeys } from './routes/quantum.js';
 import { handleMcpRequest } from './mcp/mcpServer.js';
 
+const VERSION = '1.1.0';
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', config.trustProxy);
 
-// Enable CORS for web apps, agents, IDEs, and browser extensions
 app.use(
   cors({
-    origin: '*',
+    origin: config.corsOrigins,
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
       'PAYMENT-SIGNATURE',
-      'payment-signature',
-      'PAYMENT-RESPONSE',
-      'payment-response',
       'X-Payment-Signature',
       'X-Payment-Reference',
       'X-Dev-Bypass',
       'X-QSeal-Encrypted',
       'X-QSeal-Kem',
+      'Mcp-Session-Id',
     ],
     exposedHeaders: [
       'PAYMENT-REQUIRED',
-      'payment-required',
       'PAYMENT-RESPONSE',
-      'payment-response',
       'X-Payment-Required',
       'X-402-Version',
       'X-402-Network',
@@ -52,152 +55,187 @@ app.use(
       'X-QSeal-Response-Hash',
       'X-QSeal-Sealed',
     ],
-  })
+  }),
 );
 
 app.use(express.json({ limit: '10mb' }));
 
 /**
- * STRICT ZERO-LOGGING POLICY MIDDLEWARE
- * We log ONLY method, route, and status. NEVER request bodies, prompts, or LLM outputs.
+ * Zero-logging policy: method, path and status only. Never bodies, prompts
+ * or completions. Secrets that may appear in paths are redacted.
  */
+const redact = (p: string) => p.replace(/qseal_sk_[A-Za-z0-9_]+/g, 'qseal_sk_[redacted]');
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   res.on('finish', () => {
-    const duration = Date.now() - start;
-    // Safe metadata only - zero prompt logging
-    console.log(
-      `[QSeal Gateway] ${new Date().toISOString()} ${req.method} ${req.path} -> ${res.statusCode} (${duration}ms)`
-    );
+    console.log(`[QSeal Gateway] ${new Date().toISOString()} ${req.method} ${redact(req.path)} -> ${res.statusCode} (${Date.now() - start}ms)`);
   });
   next();
 });
 
-// Basic sliding window rate limiting
+// Fixed-window rate limiting per client IP (set TRUST_PROXY behind a load balancer).
 const ipRateMap = new Map<string, { count: number; resetAt: number }>();
-app.use((req: Request, res: Response, next: NextFunction) => {
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, r] of ipRateMap) if (now > r.resetAt) ipRateMap.delete(ip);
+}, 60_000).unref();
+
+const rateLimit = (req: Request, res: Response, next: NextFunction) => {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const now = Date.now();
   let record = ipRateMap.get(ip);
-
   if (!record || now > record.resetAt) {
-    record = { count: 1, resetAt: now + config.rateLimitWindowMs };
+    record = { count: 0, resetAt: now + config.rateLimitWindowMs };
     ipRateMap.set(ip, record);
-  } else {
-    record.count++;
   }
-
+  record.count++;
   if (record.count > config.rateLimitMax) {
-    return res.status(429).json({
-      error: {
-        message: 'Rate limit exceeded. Please wait before sending more requests.',
-        type: 'rate_limit_error',
-      },
-    });
+    res.setHeader('Retry-After', Math.ceil((record.resetAt - now) / 1000));
+    return res.status(429).json({ error: { message: 'Rate limit exceeded. Please wait before sending more requests.', type: 'rate_limit_error' } });
   }
-
   next();
-});
+};
 
-// --- API Routes ---
+const api = express.Router();
+api.use(rateLimit);
 
-// 1. OpenAI-Compatible Chat Completions
-app.post('/v1/chat/completions', handleChatCompletions);
+// OpenAI-compatible
+api.post('/v1/chat/completions', handleChatCompletions);
+api.get('/v1/models', handleListModels);
 
-// 2. OpenAI-Compatible Models
-app.get('/v1/models', handleListModels);
+// Receipts
+api.get('/v1/receipts/stats', handleReceiptStats);
+api.get('/v1/receipts/:id', handleGetReceipt);
+api.post('/v1/receipts/verify', handleVerifyReceipt);
 
-// 3. Cryptographic Receipts
-app.get('/v1/receipts/stats', handleReceiptStats);
-app.get('/v1/receipts/:id', handleGetReceipt);
-app.post('/v1/receipts/verify', handleVerifyReceipt);
+// Prepaid keys and payments
+api.post('/v1/keys/prepaid', handleCreatePrepaidKey);
+api.post('/v1/keys/topup', handleTopUpKey);
+api.get('/v1/keys/balance', handleGetBalance);
+api.get('/v1/keys/:key/balance', handleGetKeyBalance);
+api.post('/v1/payments/prepare', handlePreparePayment);
 
-// 4. Prepaid Keys for Developers & Agents
-app.post('/v1/keys/prepaid', handleCreatePrepaidKey);
-app.get('/v1/keys/:key/balance', handleGetKeyBalance);
+// Public verification keys
+api.get('/v1/quantum-keys', handleGetQuantumKeys);
+api.get('/.well-known/qseal-keys.json', handleGetQuantumKeys);
 
-// 5. Post-Quantum Keys & Public Verification Keys
-app.get('/v1/quantum-keys', handleGetQuantumKeys);
-app.get('/.well-known/qseal-keys.json', handleGetQuantumKeys);
+// MCP (JSON-RPC over HTTP)
+api.post('/mcp', handleMcpRequest);
 
-// 6. MCP Protocol Handler
-app.post('/mcp', handleMcpRequest);
-
-// 7. Health & Status
-app.get('/health', (req: Request, res: Response) => {
-  const pubKeys = pqc.getPublicKeys();
+api.get('/health', (_req: Request, res: Response) => {
+  const keys = pqc.getPublicKeys();
   res.status(200).json({
     status: 'healthy',
     service: 'QSeal Gateway',
-    version: '1.0.0',
-    promise: 'Private AI for Solana agents. Prompts stay sealed. Quantum-resistant. Pay with USDC.',
+    version: VERSION,
+    mode: config.allowDevBypass ? 'development' : 'production',
     solana: {
       network: config.solanaNetwork,
       caip2: config.caip2Network,
+      wallet_chain: config.walletChain,
       payTo: config.payTo,
       payToAta: solanaVerifier.getPayToAta(),
       usdc_mint: config.usdcMint,
-      price_per_request_usdc: config.pricePerRequestUsdc,
+      price_per_request_usdc: priceFor(config.defaultModel),
+      min_prepaid_deposit_usdc: config.minPrepaidDepositUsdc,
     },
     pqc: {
       algorithms: 'NIST ML-KEM-768 + NIST ML-DSA-65 + Ed25519',
-      ml_kem_pubkey_hash: pubKeys.mlKemPublicKey.slice(0, 16) + '...',
-      ml_dsa_pubkey_hash: pubKeys.mlDsaPublicKey.slice(0, 16) + '...',
+      ml_kem_pubkey_hash: keys.mlKemPublicKey.slice(0, 16) + '...',
+      ml_dsa_pubkey_hash: keys.mlDsaPublicKey.slice(0, 16) + '...',
       verification_url: '/.well-known/qseal-keys.json',
     },
     upstream: {
-      provider: config.upstreamProvider || 'none (using built-in zero-retention quantum engine)',
-      active: Boolean(config.upstreamApiKey),
+      provider: hasUpstream() ? config.upstreamProvider : config.allowDevBypass ? 'dev-engine' : 'none',
+      active: hasUpstream(),
     },
     policies: {
       zero_prompt_retention: true,
-      quantum_sealed_in_memory: true,
+      sealed_prompts_supported: true,
       verifiable_signed_receipts: true,
       official_x402_v2: true,
     },
   });
 });
 
-// Root Gateway Info
-app.get('/', (req: Request, res: Response) => {
-  res.status(200).json({
-    name: 'QSeal Gateway',
-    tagline: 'Private AI for Solana agents. Prompts stay sealed. Quantum-resistant. Pay with USDC.',
-    version: '1.0.0',
-    endpoints: {
-      completions: 'POST /v1/chat/completions',
-      models: 'GET /v1/models',
-      quantum_keys: 'GET /v1/quantum-keys',
-      well_known_keys: 'GET /.well-known/qseal-keys.json',
-      prepaid_keys: 'POST /v1/keys/prepaid',
-      receipts: 'GET /v1/receipts/:id',
-      verify_receipt: 'POST /v1/receipts/verify',
-      mcp: 'POST /mcp',
-      health: 'GET /health',
-    },
-    docs: 'https://github.com/qseal/qseal',
+const info = {
+  name: 'QSeal Gateway',
+  tagline: 'Private AI for Solana agents. Quantum-resistant receipts. Pay with USDC.',
+  version: VERSION,
+  endpoints: {
+    completions: 'POST /v1/chat/completions',
+    models: 'GET /v1/models',
+    quantum_keys: 'GET /v1/quantum-keys',
+    well_known_keys: 'GET /.well-known/qseal-keys.json',
+    prepaid_keys: 'POST /v1/keys/prepaid',
+    topup: 'POST /v1/keys/topup',
+    balance: 'GET /v1/keys/balance',
+    prepare_payment: 'POST /v1/payments/prepare',
+    receipts: 'GET /v1/receipts/:id',
+    verify_receipt: 'POST /v1/receipts/verify',
+    mcp: 'POST /mcp',
+    health: 'GET /health',
+  },
+};
+api.get('/v1', (_req, res) => res.json(info));
+
+app.use(api);
+
+// Optional: serve the built web app from the same origin.
+const frontend = config.serveFrontendDir;
+if (frontend && fs.existsSync(path.join(frontend, 'index.html'))) {
+  app.use(express.static(frontend, { index: false, maxAge: '1h' }));
+  app.get(/^\/(?!v1\/|v1$|mcp$|health$|\.well-known\/).*/, (req, res, next) => {
+    if (!req.accepts('html')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(frontend, 'index.html'));
   });
+} else {
+  app.get('/', (_req, res) => res.json(info));
+}
+
+// JSON 404 and error responses (never echo request content).
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ error: { message: 'Not found', type: 'not_found' } });
+});
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: { message: 'Request body is not valid JSON', type: 'invalid_request_error' } });
+  }
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: { message: 'Request body is too large', type: 'invalid_request_error' } });
+  }
+  console.error(`[QSeal Gateway] Unhandled error: ${err?.name || 'Error'}`);
+  return res.status(500).json({ error: { message: 'Internal gateway error', type: 'api_error' } });
 });
 
 export function startServer(port = config.port) {
+  const problems = validateProductionConfig();
+  if (problems.length) {
+    console.error('\n[QSeal Gateway] Refusing to start in production:\n' + problems.map((p) => `  - ${p}`).join('\n') + '\n');
+    process.exit(1);
+  }
+  getDb(); // open (and migrate) the database before accepting traffic
+
   const server = app.listen(port, config.host, () => {
     console.log(`\n======================================================`);
-    console.log(`🔒 QSEAL GATEWAY ONLINE: http://${config.host}:${port}`);
-    console.log(`⚡ OpenAI-Compatible: POST /v1/chat/completions`);
-    console.log(`💰 x402 V2 Solana Payments: ${config.pricePerRequestUsdc} USDC`);
-    console.log(`📍 Solana Network: ${config.solanaNetwork} (${config.caip2Network})`);
-    console.log(`💳 PayTo: ${config.payTo} (ATA: ${solanaVerifier.getPayToAta()})`);
-    console.log(`⚛️  NIST PQC Active: ML-KEM-768 & ML-DSA-65`);
-    console.log(`🔑 Verification Key: http://${config.host}:${port}/.well-known/qseal-keys.json`);
-    console.log(`🌐 Live Model Provider: ${config.upstreamProvider || 'built-in quantum engine'}`);
-    console.log(`🛡️  Zero Prompt Logging: Enforced`);
+    console.log(`QSeal Gateway ${VERSION} on http://${config.host}:${port} (${config.allowDevBypass ? 'DEVELOPMENT' : 'production'} mode)`);
+    console.log(`Solana: ${config.solanaNetwork} (${config.caip2Network}) payTo ${config.payTo}`);
+    console.log(`Model provider: ${hasUpstream() ? config.upstreamProvider : config.allowDevBypass ? 'dev engine (not a model)' : 'NONE'}`);
+    console.log(`Database: ${config.databasePath}`);
+    if (frontend) console.log(`Serving web app from ${frontend}`);
+    if (config.allowDevBypass) console.log('WARNING: dev bypass is ON. Free requests are possible. Never use this in production.');
     console.log(`======================================================\n`);
   });
+
+  const shutdown = () => server.close(() => process.exit(0));
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
   return server;
 }
 
-const isMainModule = process.argv[1]?.replace(/\\/g, '/').endsWith('src/server.ts') || 
-                     process.argv[1]?.replace(/\\/g, '/').endsWith('dist/server.js');
+const isMainModule =
+  process.argv[1]?.replace(/\\/g, '/').endsWith('src/server.ts') || process.argv[1]?.replace(/\\/g, '/').endsWith('dist/server.js');
 
 if (isMainModule && process.env.NODE_ENV !== 'test') {
   startServer();

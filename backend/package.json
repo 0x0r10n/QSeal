@@ -1,14 +1,15 @@
 {
   "name": "qseal-backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "QSeal: Quantum-secure private AI inference gateway for Solana agents",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "tsx watch src/server.ts",
-    "test": "tsx test/run_all_tests.ts"
+    "start": "node --disable-warning=ExperimentalWarning dist/server.js",
+    "dev": "ALLOW_DEV_BYPASS=true tsx watch src/server.ts",
+    "test": "tsx test/run_all_tests.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@noble/post-quantum": "^0.2.0",
@@ -24,5 +25,8 @@
     "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

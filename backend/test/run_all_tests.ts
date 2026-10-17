@@ -1,325 +1,431 @@
-import app from '../src/server.js';
-import { pqc } from '../src/crypto/pqc.js';
-import { PromptSealer } from '../src/crypto/seal.js';
-import { ReceiptManager } from '../src/crypto/receipt.js';
 import http from 'http';
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+
+// Isolated, development-mode environment. Set before the app modules load.
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'qseal-test-'));
+process.env.NODE_ENV = 'test';
+process.env.ALLOW_DEV_BYPASS = 'true';
+process.env.DATABASE_PATH = path.join(tmp, 'qseal.db');
+process.env.PQC_KEYS_FILE = path.join(tmp, 'keys.json');
+for (const k of ['GROQ_API_KEY', 'OPENROUTER_API_KEY', 'TOGETHER_API_KEY', 'FIREWORKS_API_KEY', 'UPSTREAM_API_KEY', 'OPENAI_API_KEY']) {
+  delete process.env[k];
+}
+
+const { default: app } = await import('../src/server.js');
+const { config, validateProductionConfig } = await import('../src/config.js');
+const { PromptSealer } = await import('../src/crypto/seal.js');
+const { ReceiptManager } = await import('../src/crypto/receipt.js');
+const { closeDb } = await import('../src/store/db.js');
+const { solanaVerifier } = await import('../src/payments/solana.js');
+const web3 = await import('@solana/web3.js');
+const { ml_kem768 } = await import('@noble/post-quantum/ml-kem');
+const { ml_dsa65 } = await import('@noble/post-quantum/ml-dsa');
 
 let server: http.Server;
 const TEST_PORT = 4029;
 const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 
 function request(
-  path: string,
-  options: {
-    method?: string;
-    headers?: Record<string, string>;
-    body?: any;
-  } = {}
+  p: string,
+  options: { method?: string; headers?: Record<string, string>; body?: any } = {},
 ): Promise<{ status: number; headers: http.IncomingHttpHeaders; data: any }> {
   return new Promise((resolve, reject) => {
-    const url = new URL(path, BASE_URL);
     const req = http.request(
-      url,
-      {
-        method: options.method || 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options.headers || {}),
-        },
-      },
-      res => {
-        let rawData = '';
-        res.on('data', chunk => {
-          rawData += chunk;
-        });
+      new URL(p, BASE_URL),
+      { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } },
+      (res) => {
+        let raw = '';
+        res.on('data', (c) => (raw += c));
         res.on('end', () => {
-          let parsedData = rawData;
+          let data: any = raw;
           try {
-            parsedData = JSON.parse(rawData);
+            data = JSON.parse(raw);
           } catch {}
-          resolve({
-            status: res.statusCode || 500,
-            headers: res.headers,
-            data: parsedData,
-          });
+          resolve({ status: res.statusCode || 500, headers: res.headers, data });
         });
-      }
+      },
     );
-
     req.on('error', reject);
-    if (options.body) {
-      req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
-    }
+    if (options.body !== undefined) req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
     req.end();
   });
 }
 
-async function runTests() {
-  console.log(`\n======================================================`);
-  console.log(`🧪 STARTING QSEAL COMPREHENSIVE PRODUCTION TEST SUITE`);
-  console.log(`======================================================\n`);
+const assert = (cond: unknown, msg: string) => {
+  if (!cond) throw new Error(msg);
+};
+const chat = (body: any, headers: Record<string, string> = {}) =>
+  request('/v1/chat/completions', { method: 'POST', headers, body });
+const msg = (content: string) => ({ model: 'qseal-quantum-70b', messages: [{ role: 'user', content }] });
+const paymentSig = (signature: string) => Buffer.from(JSON.stringify({ version: 2, signature })).toString('base64');
 
+/** Point the gateway at an unreachable provider so models are "available" but inference fails. */
+function withBrokenUpstream<T>(fn: () => Promise<T>): Promise<T> {
+  const saved = { p: config.upstreamProvider, u: config.upstreamBaseUrl, k: config.upstreamApiKey, m: process.env.UPSTREAM_MODEL_MAP };
+  config.upstreamProvider = 'custom';
+  config.upstreamBaseUrl = 'http://127.0.0.1:1';
+  config.upstreamApiKey = 'test';
+  process.env.UPSTREAM_MODEL_MAP = 'qseal-quantum-70b=test-model';
+  return fn().finally(() => {
+    config.upstreamProvider = saved.p;
+    config.upstreamBaseUrl = saved.u;
+    config.upstreamApiKey = saved.k;
+    if (saved.m === undefined) delete process.env.UPSTREAM_MODEL_MAP;
+    else process.env.UPSTREAM_MODEL_MAP = saved.m;
+  });
+}
+
+async function runTests() {
+  console.log(`\n=== QSeal gateway test suite ===\n`);
   server = app.listen(TEST_PORT, '127.0.0.1');
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 200));
 
   let passed = 0;
   let failed = 0;
-
   async function test(name: string, fn: () => Promise<void>) {
     try {
       await fn();
-      console.log(`✅ [PASS] ${name}`);
+      console.log(`PASS  ${name}`);
       passed++;
     } catch (err: any) {
-      console.error(`❌ [FAIL] ${name}:`, err?.message || err);
+      console.error(`FAIL  ${name}: ${err?.message || err}`);
       failed++;
     }
   }
 
-  // TEST 1: Health & Gateway Status
-  await test('GET /health returns healthy status, CAIP-2 network, and PQC keys', async () => {
+  await test('GET /health reports mode, CAIP-2 network and PQC algorithms', async () => {
     const res = await request('/health');
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    if (res.data.status !== 'healthy') throw new Error('Status not healthy');
-    if (!res.data.solana.caip2.startsWith('solana:')) throw new Error('Missing CAIP-2 network');
-    if (!res.data.pqc.algorithms.includes('ML-KEM-768')) throw new Error('Missing ML-KEM-768');
+    assert(res.status === 200 && res.data.status === 'healthy', `health ${res.status}`);
+    assert(res.data.mode === 'development', 'mode should be development in tests');
+    assert(res.data.solana.caip2.startsWith('solana:'), 'missing CAIP-2');
+    assert(res.data.pqc.algorithms.includes('ML-KEM-768'), 'missing ML-KEM-768');
   });
 
-  // TEST 2: OpenAI-Compatible GET /v1/models with Pricing
-  await test('GET /v1/models returns model list with capabilities and pricing', async () => {
+  await test('GET /v1/models lists catalogue models with pricing and who serves them', async () => {
     const res = await request('/v1/models');
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    if (!Array.isArray(res.data.data) || res.data.data.length === 0) {
-      throw new Error('Expected models array');
-    }
-    const quantumModel = res.data.data.find((m: any) => m.id === 'qseal-quantum-70b');
-    if (!quantumModel) throw new Error('qseal-quantum-70b not found in model list');
-    if (!quantumModel.capabilities.quantum_sealed) throw new Error('Model capabilities missing');
-    if (!quantumModel.pricing?.price_per_request_usdc) throw new Error('Model pricing missing');
+    const m = res.data.data.find((x: any) => x.id === 'qseal-quantum-70b');
+    assert(m, 'qseal-quantum-70b missing');
+    assert(m.pricing.price_per_request_usdc > 0, 'pricing missing');
+    assert(m.served_by.provider === 'dev-engine', `served_by ${JSON.stringify(m.served_by)}`);
   });
 
-  // TEST 3: Official Solana x402 V2 PAYMENT-REQUIRED Challenge
-  let lastX402Challenge: any = null;
-  await test('POST /v1/chat/completions unpaid returns official x402 V2 PAYMENT-REQUIRED header', async () => {
-    const res = await request('/v1/chat/completions', {
-      method: 'POST',
-      body: {
-        model: 'qseal-quantum-70b',
-        messages: [{ role: 'user', content: 'Hello QSeal' }],
-      },
-    });
-
-    if (res.status !== 402) throw new Error(`Expected 402 Payment Required, got ${res.status}`);
-    
-    // Check official x402 V2 header
-    const paymentReqHeader = (res.headers['payment-required'] || res.headers['PAYMENT-REQUIRED']) as string;
-    if (!paymentReqHeader) throw new Error('Missing official PAYMENT-REQUIRED header');
-    
-    const decoded = JSON.parse(Buffer.from(paymentReqHeader, 'base64').toString('utf8'));
-    if (decoded.x402Version !== 2) throw new Error(`Expected x402Version 2, got ${decoded.x402Version}`);
-    if (!decoded.accepts[0].network.startsWith('solana:')) throw new Error('Accepts network not CAIP-2');
-    if (!decoded.accepts[0].payTo) throw new Error('Missing payTo in accepts');
-    if (!decoded.accepts[0].asset) throw new Error('Missing asset in accepts');
-    if (!decoded.accepts[0].price) throw new Error('Missing price in accepts');
-
-    // Also check standard helper headers
-    if (res.headers['x-payment-required'] !== 'true') throw new Error('Missing X-Payment-Required header');
-    if (!res.headers['x-402-recipient']) throw new Error('Missing X-402-Recipient header');
-    if (!res.headers['x-402-reference']) throw new Error('Missing X-402-Reference header');
-    
-    lastX402Challenge = decoded;
+  let challenge: any;
+  await test('Unpaid chat request returns an x402 V2 PAYMENT-REQUIRED challenge', async () => {
+    const res = await chat(msg('Hello'));
+    assert(res.status === 402, `expected 402, got ${res.status}`);
+    challenge = JSON.parse(Buffer.from(res.headers['payment-required'] as string, 'base64').toString('utf8'));
+    assert(challenge.x402Version === 2, 'x402Version');
+    assert(challenge.accepts[0].network.startsWith('solana:'), 'network');
+    assert(res.headers['x-402-reference'], 'reference header');
   });
 
-  // TEST 4: Standard x402 V2 PAYMENT-SIGNATURE Header Payment Flow
-  let lastReceiptId: string = '';
-  const testTxSignature = `sim_tx_x402_v2_${Date.now()}`;
-  await test('POST /v1/chat/completions with standard PAYMENT-SIGNATURE succeeds & returns PAYMENT-RESPONSE', async () => {
-    const paymentPayload = {
-      version: 2,
-      network: lastX402Challenge.accepts[0].network,
-      signature: testTxSignature,
-    };
-    const b64PaymentSig = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
-
-    const res = await request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'PAYMENT-SIGNATURE': b64PaymentSig,
-      },
-      body: {
-        model: 'qseal-quantum-70b',
-        messages: [{ role: 'user', content: 'What is QSeal?' }],
-      },
-    });
-
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}: ${JSON.stringify(res.data)}`);
-    if (res.data.object !== 'chat.completion') throw new Error('Response object is not chat.completion');
-    if (!res.data.choices[0].message.content) throw new Error('No content returned');
-    
-    // Check official settlement header PAYMENT-RESPONSE
-    const paymentRespHeader = (res.headers['payment-response'] || res.headers['PAYMENT-RESPONSE']) as string;
-    if (!paymentRespHeader) throw new Error('Missing PAYMENT-RESPONSE settlement header');
-    const decodedResp = JSON.parse(Buffer.from(paymentRespHeader, 'base64').toString('utf8'));
-    if (!decodedResp.settled) throw new Error('PAYMENT-RESPONSE not marked settled');
-
-    const receiptIdHeader = res.headers['x-qseal-receipt-id'] as string;
-    const receiptSigHeader = res.headers['x-qseal-receipt-signature'] as string;
-    if (!receiptIdHeader) throw new Error('Missing X-QSeal-Receipt-Id header');
-    if (!receiptSigHeader) throw new Error('Missing X-QSeal-Receipt-Signature header');
-    if (!res.data.qseal_receipt) throw new Error('Missing qseal_receipt in response body');
-    
-    lastReceiptId = receiptIdHeader;
+  let receiptId = '';
+  const simSig = `sim_tx_${Date.now()}`;
+  await test('Paid request succeeds with PAYMENT-RESPONSE and a v2 signed receipt', async () => {
+    const res = await chat(msg('What is QSeal?'), { 'PAYMENT-SIGNATURE': paymentSig(simSig) });
+    assert(res.status === 200, `expected 200, got ${res.status} ${JSON.stringify(res.data)}`);
+    assert(res.data.choices[0].message.content.includes('dev engine'), 'dev engine output must be labelled');
+    const settle = JSON.parse(Buffer.from(res.headers['payment-response'] as string, 'base64').toString('utf8'));
+    assert(settle.settled, 'not settled');
+    assert(res.data.qseal_receipt.version === '2', 'receipt version');
+    receiptId = res.headers['x-qseal-receipt-id'] as string;
   });
 
-  // TEST 5: Anti-Replay Protection
-  await test('Anti-replay prevents double spending the exact same transaction signature', async () => {
-    const paymentPayload = {
-      version: 2,
-      network: lastX402Challenge.accepts[0].network,
-      signature: testTxSignature, // Already spent in Test 4
-    };
-    const b64PaymentSig = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
-
-    const res = await request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'PAYMENT-SIGNATURE': b64PaymentSig,
-      },
-      body: {
-        model: 'qseal-quantum-70b',
-        messages: [{ role: 'user', content: 'Replay attack test' }],
-      },
-    });
-
-    if (res.status !== 402) throw new Error(`Expected 402 rejection on replay, got ${res.status}`);
+  await test('Replaying a spent payment signature is rejected', async () => {
+    const res = await chat(msg('Replay'), { 'PAYMENT-SIGNATURE': paymentSig(simSig) });
+    assert(res.status === 402, `expected 402, got ${res.status}`);
+    assert(/already spent/.test(res.data.error.reason), 'reason should mention replay');
   });
 
-  // TEST 6: Stable Public Key at /.well-known/qseal-keys.json
-  await test('GET /.well-known/qseal-keys.json returns stable public keys', async () => {
+  await test('GET /.well-known/qseal-keys.json returns public keys only', async () => {
     const res = await request('/.well-known/qseal-keys.json');
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    if (!res.data.mlDsaPublicKey) throw new Error('Missing mlDsaPublicKey');
-    if (!res.data.mlKemPublicKey) throw new Error('Missing mlKemPublicKey');
-    if (!res.data.solana.payTo) throw new Error('Missing payTo in well-known keys');
+    assert(res.data.mlDsaPublicKey && res.data.mlKemPublicKey, 'keys missing');
+    assert(!JSON.stringify(res.data).includes('SecretKey'), 'secret material exposed');
   });
 
-  // TEST 7: Cryptographic Receipt Verification against Stable Public Key
-  await test('Receipt verification confirms ML-DSA-65 signature against stable public key', async () => {
-    const res = await request(`/v1/receipts/${lastReceiptId}`);
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    if (!res.data.receipt) throw new Error('Missing receipt object');
-    if (!res.data.verification.valid) throw new Error('Receipt verification failed');
-    if (!res.data.verification.mlDsaValid) throw new Error('ML-DSA-65 signature invalid');
-
-    // Also test POST /v1/receipts/verify
-    const verifyPost = await request('/v1/receipts/verify', {
-      method: 'POST',
-      body: { receipt_id: lastReceiptId },
-    });
-    if (!verifyPost.data.verification.valid) throw new Error('POST verify failed');
+  await test('Receipts verify by ID and by body against the gateway keys', async () => {
+    const byId = await request(`/v1/receipts/${receiptId}`);
+    assert(byId.data.verification.valid && byId.data.verification.signerMatchesGateway, 'GET verify failed');
+    const byBody = await request('/v1/receipts/verify', { method: 'POST', body: { receipt: byId.data.receipt } });
+    assert(byBody.data.verification.valid, 'POST verify failed');
   });
 
-  // TEST 8: Post-Quantum Prompt Sealing (ML-KEM-768 + AES-256-GCM)
-  await test('Client can seal prompt with ML-KEM-768 and gateway unseals in ephemeral RAM', async () => {
-    const keysRes = await request('/v1/quantum-keys');
-    const gatewayKemPub = keysRes.data.mlKemPublicKey;
+  await test('A tampered receipt is rejected', async () => {
+    const { data } = await request(`/v1/receipts/${receiptId}`);
+    const tampered = { ...data.receipt, model: 'qseal-deepseek-r1' };
+    const res = await request('/v1/receipts/verify', { method: 'POST', body: { receipt: tampered } });
+    assert(res.data.verification.valid === false, 'tampered receipt accepted');
+  });
 
-    const clientPayload = {
-      model: 'qseal-quantum-70b',
-      messages: [{ role: 'user', content: 'Quantum-sealed secret agent prompt' }],
+  await test('A receipt signed with someone else’s keys is rejected', async () => {
+    const { data } = await request(`/v1/receipts/${receiptId}`);
+    const forged = { ...data.receipt, id: 'rcpt_forged' };
+    const canonical = ReceiptManager.canonicalString(forged);
+    const dsa = ml_dsa65.keygen(crypto.randomBytes(32));
+    const ed = crypto.generateKeyPairSync('ed25519');
+    const edPub = ed.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32).toString('hex');
+    forged.pqc = {
+      ...forged.pqc,
+      mlDsaPublicKey: Buffer.from(dsa.publicKey).toString('hex'),
+      ed25519PublicKey: edPub,
+      mlDsaSignature: Buffer.from(ml_dsa65.sign(dsa.secretKey, new TextEncoder().encode(canonical))).toString('hex'),
+      ed25519Signature: crypto.sign(null, Buffer.from(canonical), ed.privateKey).toString('hex'),
     };
-    const sealed = PromptSealer.seal(clientPayload, gatewayKemPub);
-
-    const res = await request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'X-Dev-Bypass': 'true',
-      },
-      body: sealed,
-    });
-
-    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-    if (res.headers['x-qseal-sealed'] !== 'true') throw new Error('Expected X-QSeal-Sealed header');
-    if (!res.data.choices[0].message.content) throw new Error('Failed to unseal and complete');
-    if (!res.data.qseal_receipt.sealed) throw new Error('Receipt did not flag sealed: true');
+    const res = await request('/v1/receipts/verify', { method: 'POST', body: { receipt: forged } });
+    assert(res.data.verification.valid === false, 'forged receipt accepted');
+    assert(res.data.verification.signerMatchesGateway === false, 'signer check');
   });
 
-  // TEST 9: Prepaid API Keys & Quota Deduction
-  await test('Prepaid API key issuance and autonomous authorization', async () => {
-    const createRes = await request('/v1/keys/prepaid', {
-      method: 'POST',
-      body: {
-        wallet: 'SolanaAgentWallet1111111111111111111111111111',
-        amount_usdc: 5.0,
-      },
-    });
+  await test('Sealed prompt is unsealed in memory and the response is sealed back', async () => {
+    const keys = await request('/v1/quantum-keys');
+    const client = ml_kem768.keygen();
+    const sealed = PromptSealer.seal(msg('Sealed secret'), keys.data.mlKemPublicKey, Buffer.from(client.publicKey).toString('hex'));
+    const res = await chat(sealed, { 'X-Dev-Bypass': 'true' });
+    assert(res.status === 200, `expected 200, got ${res.status} ${JSON.stringify(res.data)}`);
+    assert(res.headers['x-qseal-sealed'] === 'true', 'sealed header');
+    assert(res.data.qseal_receipt.sealed === true, 'receipt sealed flag');
+    // Decrypt the sealed response with the client's ephemeral secret key.
+    const shared = ml_kem768.decapsulate(Buffer.from(res.data.kemCiphertext, 'hex'), client.secretKey);
+    const key = crypto.createHash('sha256').update(shared).digest();
+    const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(res.data.iv, 'hex'));
+    d.setAuthTag(Buffer.from(res.data.authTag, 'hex'));
+    const inner = JSON.parse(d.update(res.data.ciphertext, 'hex', 'utf8') + d.final('utf8'));
+    assert(inner.choices[0].message.content, 'sealed response did not decrypt');
+  });
 
-    if (createRes.status !== 201) throw new Error(`Expected 201, got ${createRes.status}`);
-    const apiKey = createRes.data.api_key;
-    if (!apiKey || !apiKey.startsWith('qseal_sk_')) throw new Error('Invalid API key generated');
+  await test('A garbage sealed payload is a 400, not a 500', async () => {
+    const res = await chat({ sealed: true, kemCiphertext: '00', iv: '00', authTag: '00', ciphertext: '00' }, { 'X-Dev-Bypass': 'true' });
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+  });
 
-    const inferRes = await request('/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: {
-        messages: [{ role: 'user', content: 'Prepaid key inference test' }],
-      },
-    });
+  let apiKey = '';
+  await test('Prepaid keys cannot be minted without a deposit', async () => {
+    const res = await request('/v1/keys/prepaid', { method: 'POST', body: { wallet: 'W', amount_usdc: 1000 } });
+    assert(res.status === 402, `expected 402, got ${res.status}`);
+  });
 
-    if (inferRes.status !== 200) throw new Error(`Expected 200, got ${inferRes.status}`);
-    if (inferRes.data.qseal_receipt.payment.type !== 'prepaid-key') {
-      throw new Error('Payment type not prepaid-key');
+  await test('Prepaid key (dev) authorises requests and deducts per request', async () => {
+    const created = await request('/v1/keys/prepaid', { method: 'POST', body: { dev: true, amount_usdc: 5 } });
+    assert(created.status === 201, `expected 201, got ${created.status}`);
+    apiKey = created.data.api_key;
+    const res = await chat(msg('Prepaid'), { Authorization: `Bearer ${apiKey}` });
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    assert(res.data.qseal_receipt.payment.type === 'prepaid-key', 'payment type');
+    const bal = await request('/v1/keys/balance', { headers: { Authorization: `Bearer ${apiKey}` } });
+    assert(bal.data.total_requests === 1, 'request count');
+    assert(bal.data.balance_usdc < 5, 'balance not deducted');
+  });
+
+  await test('Unknown models are rejected before anything is charged', async () => {
+    const before = (await request('/v1/keys/balance', { headers: { Authorization: `Bearer ${apiKey}` } })).data;
+    const res = await chat({ model: 'gpt-nope', messages: [{ role: 'user', content: 'x' }] }, { Authorization: `Bearer ${apiKey}` });
+    assert(res.status === 404, `expected 404, got ${res.status}`);
+    const after = (await request('/v1/keys/balance', { headers: { Authorization: `Bearer ${apiKey}` } })).data;
+    assert(after.balance_usdc === before.balance_usdc, 'charged for an invalid request');
+  });
+
+  await test('Failed inference refunds the prepaid key', async () => {
+    const before = (await request('/v1/keys/balance', { headers: { Authorization: `Bearer ${apiKey}` } })).data;
+    const res = await withBrokenUpstream(() => chat(msg('Will fail'), { Authorization: `Bearer ${apiKey}` }));
+    assert(res.status === 502, `expected 502, got ${res.status}`);
+    assert(/not charged/.test(res.data.error.message), 'error should say not charged');
+    const after = (await request('/v1/keys/balance', { headers: { Authorization: `Bearer ${apiKey}` } })).data;
+    assert(after.balance_usdc === before.balance_usdc && after.total_requests === before.total_requests, 'not refunded');
+  });
+
+  await test('Failed inference releases an on-chain payment for retry', async () => {
+    const sig = `sim_tx_retry_${Date.now()}`;
+    const failed1 = await withBrokenUpstream(() => chat(msg('x'), { 'PAYMENT-SIGNATURE': paymentSig(sig) }));
+    assert(failed1.status === 502, `expected 502, got ${failed1.status}`);
+    const retry = await chat(msg('x'), { 'PAYMENT-SIGNATURE': paymentSig(sig) });
+    assert(retry.status === 200, `retry should succeed, got ${retry.status}`);
+  });
+
+  await test('With dev bypass off, bypass header, simulated payments and free keys are refused', async () => {
+    config.allowDevBypass = false;
+    try {
+      await withBrokenUpstream(async () => {
+        const bypass = await chat(msg('free?'), { 'X-Dev-Bypass': 'true' });
+        assert(bypass.status === 402, `bypass header: ${bypass.status}`);
+        const sim = await chat(msg('free?'), { 'PAYMENT-SIGNATURE': paymentSig(`sim_tx_${Date.now()}`) });
+        assert(sim.status === 402, `simulated payment: ${sim.status}`);
+        const key = await request('/v1/keys/prepaid', { method: 'POST', body: { dev: true, amount_usdc: 50 } });
+        assert(key.status === 402, `free key: ${key.status}`);
+      });
+    } finally {
+      config.allowDevBypass = true;
     }
-
-    const balRes = await request(`/v1/keys/${apiKey}/balance`);
-    if (balRes.data.total_requests !== 1) throw new Error('Request count did not increment');
-    if (balRes.data.balance_usdc >= 5.0) throw new Error('Balance was not deducted');
   });
 
-  // TEST 10: MCP (Model Context Protocol) Endpoint
-  await test('MCP endpoint supports tool listing and execution', async () => {
-    const listRes = await request('/mcp', {
-      method: 'POST',
-      body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
-    });
-    if (listRes.status !== 200) throw new Error(`Expected 200, got ${listRes.status}`);
-    const tools = listRes.data.result.tools;
-    if (!tools.find((t: any) => t.name === 'qseal_infer')) throw new Error('qseal_infer tool missing');
-
-    const callRes = await request('/mcp', {
-      method: 'POST',
-      body: {
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'tools/call',
-        params: {
-          name: 'qseal_infer',
-          arguments: { prompt: 'Agent autonomous MCP execution' },
-        },
-      },
-    });
-    if (callRes.status !== 200) throw new Error(`Expected 200, got ${callRes.status}`);
-    if (!callRes.data.result.content[0].text) throw new Error('MCP content empty');
+  await test('Without a provider in production mode, requests fail closed', async () => {
+    config.allowDevBypass = false;
+    try {
+      const res = await chat(msg('x'), { Authorization: `Bearer ${apiKey}` });
+      assert(res.status === 404, `expected model unavailable, got ${res.status}`);
+      const models = await request('/v1/models');
+      assert(models.data.data.length === 0, 'no models should be listed');
+    } finally {
+      config.allowDevBypass = true;
+    }
   });
 
-  // Clean up
-  server.close();
+  await test('MCP: initialize, list tools, paid inference only', async () => {
+    const init = await request('/mcp', { method: 'POST', body: { jsonrpc: '2.0', id: 0, method: 'initialize', params: {} } });
+    assert(init.data.result.serverInfo.name === 'qseal', 'initialize');
+    const list = await request('/mcp', { method: 'POST', body: { jsonrpc: '2.0', id: 1, method: 'tools/list' } });
+    assert(list.data.result.tools.some((t: any) => t.name === 'qseal_infer'), 'tool missing');
+    const call = { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'qseal_infer', arguments: { prompt: 'Agent call' } } };
+    const unpaid = await request('/mcp', { method: 'POST', body: call });
+    assert(unpaid.data.error?.code === 402, `unpaid MCP call should be refused: ${JSON.stringify(unpaid.data)}`);
+    const paid = await request('/mcp', { method: 'POST', body: call, headers: { Authorization: `Bearer ${apiKey}` } });
+    assert(paid.data.result.content[0].text && paid.data.result.qseal_receipt, 'paid MCP call failed');
+  });
 
-  console.log(`\n======================================================`);
-  console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
-  console.log(`======================================================\n`);
+  await test('Access log never contains prepaid key secrets', async () => {
+    const lines: string[] = [];
+    const orig = console.log;
+    console.log = (...a: unknown[]) => {
+      lines.push(a.join(' '));
+      orig(...a);
+    };
+    try {
+      await request(`/v1/keys/${apiKey}/balance`);
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      console.log = orig;
+    }
+    assert(lines.length > 0, 'nothing logged');
+    assert(!lines.some((l) => l.includes(apiKey)), 'key leaked into logs');
+  });
 
-  if (failed > 0) {
-    process.exit(1);
-  } else {
-    process.exit(0);
+  await test('Invalid JSON gets a JSON 400', async () => {
+    const res = await request('/v1/chat/completions', { method: 'POST', body: '{not json' });
+    assert(res.status === 400 && res.data.error, `expected JSON 400, got ${res.status}`);
+  });
+
+  await test('Balances, receipts and spent payments survive a restart', async () => {
+    closeDb();
+    const bal = await request('/v1/keys/balance', { headers: { Authorization: `Bearer ${apiKey}` } });
+    assert(bal.status === 200, 'key lost after reopen');
+    const rec = await request(`/v1/receipts/${receiptId}`);
+    assert(rec.status === 200 && rec.data.verification.valid, 'receipt lost after reopen');
+    const replay = await chat(msg('Replay after restart'), { 'PAYMENT-SIGNATURE': paymentSig(simSig) });
+    assert(replay.status === 402, 'spent payment usable again after restart');
+  });
+
+  // --- On-chain payment verification against a stubbed RPC (no network needed) ---
+  const treasury = web3.Keypair.generate().publicKey.toBase58();
+  const payerKey = web3.Keypair.generate().publicKey.toBase58();
+  const conn = (solanaVerifier as any).connection;
+  const realConn = { getParsedTransaction: conn.getParsedTransaction, getLatestBlockhash: conn.getLatestBlockhash };
+  const savedPayTo = config.payTo;
+  (solanaVerifier as any).payToAtaCache = null;
+  config.payTo = treasury;
+  config.allowDevBypass = false;
+  const ata = solanaVerifier.getPayToAta();
+  const fakeTx = (opts: { micro: number; mint?: string; owner?: string; ageSec?: number; err?: unknown }) => ({
+    blockTime: Math.floor(Date.now() / 1000) - (opts.ageSec ?? 5),
+    meta: {
+      err: opts.err ?? null,
+      preTokenBalances: [{ accountIndex: 1, mint: opts.mint ?? config.usdcMint, owner: opts.owner ?? treasury, uiTokenAmount: { amount: '1000000' } }],
+      postTokenBalances: [{ accountIndex: 1, mint: opts.mint ?? config.usdcMint, owner: opts.owner ?? treasury, uiTokenAmount: { amount: String(1000000 + opts.micro) } }],
+      preBalances: [0, 0],
+      postBalances: [0, 0],
+    },
+    transaction: { message: { accountKeys: [{ pubkey: new web3.PublicKey(payerKey) }, { pubkey: new web3.PublicKey(opts.owner === treasury || !opts.owner ? ata : payerKey) }] } },
+  });
+  let nextTx: any = null;
+  conn.getParsedTransaction = async () => nextTx;
+  conn.getLatestBlockhash = async () => ({ blockhash: web3.Keypair.generate().publicKey.toBase58(), lastValidBlockHeight: 1 });
+
+  const sig = () => `5${crypto.randomBytes(40).toString('hex')}`;
+  try {
+    await test('On-chain: a USDC transfer of the right amount to the treasury is accepted once', async () => {
+      nextTx = fakeTx({ micro: 2000 });
+      const s = sig();
+      const ok = await solanaVerifier.verifyPayment(s, undefined, 0.001);
+      assert(ok.verified && ok.amountUsdc === 0.002 && ok.payer === payerKey, JSON.stringify(ok));
+      const again = await solanaVerifier.verifyPayment(s, undefined, 0.001);
+      assert(!again.verified, 'replay accepted');
+    });
+    await test('On-chain: underpayment, wrong mint, wrong recipient, stale or failed tx are refused', async () => {
+      const cases: Array<[string, any]> = [
+        ['underpaid', fakeTx({ micro: 500 })],
+        ['wrong mint', fakeTx({ micro: 5000, mint: web3.Keypair.generate().publicKey.toBase58() })],
+        ['wrong recipient', fakeTx({ micro: 5000, owner: web3.Keypair.generate().publicKey.toBase58() })],
+        ['too old', fakeTx({ micro: 5000, ageSec: config.maxPaymentAgeSec + 60 })],
+        ['failed on-chain', fakeTx({ micro: 5000, err: { InstructionError: [0, 'Custom'] } })],
+      ];
+      for (const [name, tx] of cases) {
+        nextTx = tx;
+        const r = await solanaVerifier.verifyPayment(sig(), undefined, 0.001);
+        assert(!r.verified, `${name} was accepted`);
+      }
+    });
+    await test('On-chain: a refused (underpaid) signature is released, a stale one stays burned', async () => {
+      const s1 = sig();
+      nextTx = fakeTx({ micro: 500 });
+      await solanaVerifier.verifyPayment(s1, undefined, 0.001);
+      assert(!solanaVerifier.isSpent(s1), 'underpaid signature should not be burned');
+      const s2 = sig();
+      nextTx = fakeTx({ micro: 5000, ageSec: config.maxPaymentAgeSec + 60 });
+      await solanaVerifier.verifyPayment(s2, undefined, 0.001);
+      assert(solanaVerifier.isSpent(s2), 'stale signature must stay burned');
+    });
+    await test('Prepaid key purchase credits the verified on-chain deposit to the paying wallet', async () => {
+      nextTx = fakeTx({ micro: 2_500_000 });
+      const res = await request('/v1/keys/prepaid', { method: 'POST', body: { payment_signature: sig() } });
+      assert(res.status === 201, `expected 201, got ${res.status} ${JSON.stringify(res.data)}`);
+      assert(res.data.balance_usdc === 2.5 && res.data.wallet_address === payerKey, JSON.stringify(res.data));
+      nextTx = fakeTx({ micro: 100_000 });
+      const small = await request('/v1/keys/prepaid', { method: 'POST', body: { payment_signature: sig() } });
+      assert(small.status === 402, 'deposit below the minimum was accepted');
+    });
+    await test('POST /v1/payments/prepare builds an unsigned USDC transfer for the wallet', async () => {
+      const res = await withBrokenUpstream(() => request('/v1/payments/prepare', { method: 'POST', body: { payer: payerKey, purpose: 'request', model: 'qseal-quantum-70b' } }));
+      assert(res.status === 200, `expected 200, got ${res.status} ${JSON.stringify(res.data)}`);
+      const tx = web3.Transaction.from(Buffer.from(res.data.transaction, 'base64'));
+      assert(tx.feePayer?.toBase58() === payerKey, 'fee payer');
+      const transfer = tx.instructions[tx.instructions.length - 1];
+      assert(transfer.keys.some((k: any) => k.pubkey.toBase58() === res.data.reference), 'reference key missing');
+      assert(transfer.keys.some((k: any) => k.pubkey.toBase58() === ata), 'treasury ATA missing');
+      const amount = transfer.data.readBigUInt64LE(1);
+      assert(amount === 1000n, `amount ${amount}`);
+      const bad = await request('/v1/payments/prepare', { method: 'POST', body: { payer: payerKey, purpose: 'deposit', amount_usdc: 0.01 } });
+      assert(bad.status === 400, 'deposit below the minimum should be refused');
+    });
+  } finally {
+    conn.getParsedTransaction = realConn.getParsedTransaction;
+    conn.getLatestBlockhash = realConn.getLatestBlockhash;
+    config.payTo = savedPayTo;
+    (solanaVerifier as any).payToAtaCache = null;
+    config.allowDevBypass = true;
   }
+
+  await test('Production config check refuses dev bypass and a missing treasury', async () => {
+    const saved = config.isProduction;
+    config.isProduction = true;
+    try {
+      const problems = validateProductionConfig();
+      assert(problems.some((p) => p.includes('ALLOW_DEV_BYPASS')), 'bypass not flagged');
+      assert(problems.some((p) => p.includes('SOLANA_PAY_TO')), 'treasury not flagged');
+    } finally {
+      config.isProduction = saved;
+    }
+  });
+
+  server.close();
+  closeDb();
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
+  process.exit(failed > 0 ? 1 : 0);
 }
 
-runTests().catch(err => {
+runTests().catch((err) => {
   console.error('Test execution error:', err);
-  if (server) server.close();
+  server?.close();
   process.exit(1);
 });

@@ -1,104 +1,27 @@
 import { Request, Response } from 'express';
-import { config } from '../config.js';
+import { config, hasUpstream } from '../config.js';
+import { availableModels, priceFor, upstreamModelFor } from '../catalogue.js';
 
-export function handleListModels(req: Request, res: Response) {
-  const models = [
-    {
-      id: 'qseal-quantum-70b',
-      object: 'model',
-      created: 1715000000,
-      owned_by: 'qseal',
-      permission: [],
-      root: 'qseal-quantum-70b',
-      parent: null,
-      pricing: {
-        price_per_request_usdc: config.modelPricing['qseal-quantum-70b'] || config.pricePerRequestUsdc,
-        scheme: 'exact',
-        currency: 'USDC',
-      },
-      capabilities: {
-        quantum_sealed: true,
-        pqc_kem: 'NIST ML-KEM-768',
-        pqc_signature: 'NIST ML-DSA-65',
-        zero_logging: true,
-        x402_solana_v2: true,
-        context_window: 131072,
-        upstream_routed: Boolean(config.upstreamApiKey),
-      },
-    },
-    {
-      id: 'qseal-llama-3.3-70b',
-      object: 'model',
-      created: 1715000000,
-      owned_by: 'qseal',
-      permission: [],
-      root: 'qseal-llama-3.3-70b',
-      parent: null,
-      pricing: {
-        price_per_request_usdc: config.modelPricing['qseal-llama-3.3-70b'] || config.pricePerRequestUsdc,
-        scheme: 'exact',
-        currency: 'USDC',
-      },
-      capabilities: {
-        quantum_sealed: true,
-        pqc_kem: 'NIST ML-KEM-768',
-        pqc_signature: 'NIST ML-DSA-65',
-        zero_logging: true,
-        x402_solana_v2: true,
-        context_window: 131072,
-        upstream_routed: Boolean(config.upstreamApiKey),
-      },
-    },
-    {
-      id: 'qseal-deepseek-r1',
-      object: 'model',
-      created: 1715000000,
-      owned_by: 'qseal',
-      permission: [],
-      root: 'qseal-deepseek-r1',
-      parent: null,
-      pricing: {
-        price_per_request_usdc: config.modelPricing['qseal-deepseek-r1'] || config.pricePerRequestUsdc * 2,
-        scheme: 'exact',
-        currency: 'USDC',
-      },
-      capabilities: {
-        quantum_sealed: true,
-        pqc_kem: 'NIST ML-KEM-768',
-        pqc_signature: 'NIST ML-DSA-65',
-        zero_logging: true,
-        x402_solana_v2: true,
-        context_window: 65536,
-        upstream_routed: Boolean(config.upstreamApiKey),
-      },
-    },
-    {
-      id: 'gpt-4o-mini',
-      object: 'model',
-      created: 1715000000,
-      owned_by: 'openai',
-      permission: [],
-      root: 'gpt-4o-mini',
-      parent: null,
-      pricing: {
-        price_per_request_usdc: config.modelPricing['gpt-4o-mini'] || config.pricePerRequestUsdc,
-        scheme: 'exact',
-        currency: 'USDC',
-      },
-      capabilities: {
-        quantum_sealed: true,
-        pqc_kem: 'NIST ML-KEM-768',
-        pqc_signature: 'NIST ML-DSA-65',
-        zero_logging: true,
-        x402_solana_v2: true,
-        context_window: 128000,
-        upstream_routed: Boolean(config.upstreamApiKey),
-      },
-    },
-  ];
-
+export function handleListModels(_req: Request, res: Response) {
+  const provider = hasUpstream() ? config.upstreamProvider : config.allowDevBypass ? 'dev-engine' : undefined;
   return res.status(200).json({
     object: 'list',
-    data: models,
+    data: availableModels().map((m) => ({
+      id: m.id,
+      object: 'model',
+      created: 1715000000,
+      owned_by: 'qseal',
+      description: m.description,
+      pricing: { price_per_request_usdc: priceFor(m.id), scheme: 'exact', currency: 'USDC' },
+      capabilities: {
+        context_window: m.contextWindow,
+        sealed_prompts: 'ML-KEM-768 + AES-256-GCM (client to gateway)',
+        receipt_signature: 'ML-DSA-65 + Ed25519',
+        x402_solana_v2: true,
+        prepaid_keys: true,
+      },
+      // Transparency: which provider and upstream model serve this id.
+      served_by: { provider, upstream_model: upstreamModelFor(m.id) },
+    })),
   });
 }

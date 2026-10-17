@@ -2,6 +2,7 @@ import { ml_kem768 } from '@noble/post-quantum/ml-kem';
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa';
 import crypto from 'crypto';
 import fs from 'fs';
+import path from 'path';
 import { config } from '../config.js';
 
 export interface PQCKeyPair {
@@ -77,8 +78,12 @@ class PQCManager {
     generatedAt: string;
   } | null {
     try {
-      if (fs.existsSync(config.keysFilePath)) {
-        const raw = fs.readFileSync(config.keysFilePath, 'utf8');
+      // QSEAL_KEYS_JSON (raw JSON or base64) lets hosts without a persistent disk keep stable keys.
+      const fromEnv = process.env.QSEAL_KEYS_JSON?.trim();
+      const raw = fromEnv
+        ? (fromEnv.startsWith('{') ? fromEnv : Buffer.from(fromEnv, 'base64').toString('utf8'))
+        : fs.existsSync(config.keysFilePath) ? fs.readFileSync(config.keysFilePath, 'utf8') : null;
+      if (raw) {
         const data: StoredKeysSchema = JSON.parse(raw);
 
         const kemKeys: PQCKeyPair = {
@@ -108,6 +113,8 @@ class PQCManager {
         };
       }
     } catch (err) {
+      // Silently rotating keys would invalidate every receipt already issued.
+      if (config.isProduction) throw new Error(`[PQCManager] Stored signing keys are unreadable: ${(err as Error).message}`);
       console.warn('[PQCManager] Could not load stored keys, regenerating new keypair:', err);
     }
     return null;
@@ -131,7 +138,9 @@ class PQCManager {
         ed25519PubHex: this.edKeyPair.pubHex,
       };
 
-      fs.writeFileSync(config.keysFilePath, JSON.stringify(stored, null, 2), 'utf8');
+      fs.mkdirSync(path.dirname(config.keysFilePath), { recursive: true });
+      // Secret key material: owner read/write only.
+      fs.writeFileSync(config.keysFilePath, JSON.stringify(stored, null, 2), { encoding: 'utf8', mode: 0o600 });
       console.log(`[PQCManager] Stable PQC keys persisted to ${config.keysFilePath}`);
     } catch (err) {
       console.warn('[PQCManager] Could not write keys file:', err);
