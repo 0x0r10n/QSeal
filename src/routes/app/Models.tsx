@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowUpRight, Boxes, RefreshCw, Search } from 'lucide-react'
+import { ArrowUpRight, RefreshCw, Search } from 'lucide-react'
+import { ModelLogo } from '@/components/brand/ModelLogo'
 import { ErrorState, PageHeader, Panel, Skeleton, StatePanel, fieldClass } from '@/components/application/ui'
 import { Button } from '@/components/ui/Button'
 import { StatusTag } from '@/components/ui/StatusTag'
@@ -15,7 +16,10 @@ export default function Models() {
   useDocumentTitle('Models')
   const q = useModels()
   const [needle, setNeedle] = useState('')
-  const list = useMemo(() => (q.data ?? []).filter((m) => m.id.toLowerCase().includes(needle.trim().toLowerCase())), [q.data, needle])
+  const list = useMemo(() => {
+    const n = needle.trim().toLowerCase()
+    return (q.data ?? []).filter((m) => [m.id, m.family, m.vendor].some((f) => f?.toLowerCase().includes(n)))
+  }, [q.data, needle])
 
   return (
     <>
@@ -38,8 +42,8 @@ export default function Models() {
             Set <code className="font-mono">VITE_QSEAL_API_URL</code> to load the model catalogue.
           </StatePanel>
         ) : q.isPending ? (
-          <div className="grid gap-px bg-white/[0.04] sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid gap-px bg-white/[0.04] sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="space-y-3 bg-ink-850 p-5">
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-3 w-1/3" />
@@ -66,7 +70,7 @@ export default function Models() {
             {list.length === 0 ? (
               <StatePanel kind="empty" title="No matches" />
             ) : (
-              <ul className="grid gap-px bg-white/[0.04] sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid gap-px bg-white/[0.04] sm:grid-cols-2">
                 {list.map((m, i) => (
                   <motion.li
                     key={m.id}
@@ -76,12 +80,14 @@ export default function Models() {
                     className="group bg-ink-850 p-5 transition-colors hover:bg-ink-800"
                   >
                     <div className="flex items-start gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-white/[0.08] bg-white/[0.02]">
-                        <Boxes className="size-4 text-steel-400" strokeWidth={1.6} />
-                      </span>
+                      <ModelLogo vendor={m.vendor} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-mono text-[13px] text-steel-50" title={m.id}>{m.id}</p>
-                        {m.description && <p className="mt-1 text-[12.5px] leading-snug text-steel-400">{m.description}</p>}
+                        <p className="truncate text-[14px] font-medium text-steel-50" title={m.family ?? m.id}>{m.family ?? m.id}</p>
+                        <p className="mt-0.5 truncate font-mono text-[11.5px] text-steel-500" title={m.id}>
+                          {m.id}
+                          {m.vendor && ` · ${m.vendor === 'meta' ? 'Meta' : m.vendor === 'deepseek' ? 'DeepSeek' : m.vendor}`}
+                        </p>
+                        {m.description && <p className="mt-2 text-[12.5px] leading-snug text-steel-400">{m.description}</p>}
                       </div>
                     </div>
                     <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-white/[0.05] pt-3 text-[12px]">

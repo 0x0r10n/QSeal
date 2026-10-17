@@ -32,6 +32,8 @@ export function parseModels(data: unknown): ModelInfo[] {
         ownedBy: str(m.owned_by),
         created: num(m.created),
         description: str(m.description),
+        family: str(m.family),
+        vendor: str(m.vendor),
         priceUsdc: num(m.pricing?.price_per_request_usdc),
         contextWindow: num(m.capabilities?.context_window),
         servedBy: m.served_by ? { provider: str(m.served_by.provider), upstreamModel: str(m.served_by.upstream_model) } : undefined,

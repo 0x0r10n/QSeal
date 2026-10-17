@@ -7,6 +7,12 @@ import { config, hasUpstream, type UpstreamProvider } from './config.js';
  */
 export interface CatalogueModel {
   id: string;
+  /** Underlying open model, as its vendor names it. */
+  family: string;
+  /** Where a provider serves a different variant, its honest name there. */
+  familyByProvider?: Partial<Record<UpstreamProvider, string>>;
+  /** Who made the underlying model (used for display, e.g. logos). */
+  vendor: 'meta' | 'deepseek';
   description: string;
   /** Multiplier on PRICE_PER_REQUEST_USDC. */
   priceFactor: number;
@@ -17,6 +23,8 @@ export interface CatalogueModel {
 export const CATALOGUE: CatalogueModel[] = [
   {
     id: 'qseal-quantum-70b',
+    family: 'Llama 3.3 70B Instruct',
+    vendor: 'meta',
     description: 'General-purpose 70B instruction model. Default.',
     priceFactor: 1,
     contextWindow: 131072,
@@ -29,7 +37,9 @@ export const CATALOGUE: CatalogueModel[] = [
   },
   {
     id: 'qseal-llama-3.3-70b',
-    description: 'Llama 3.3 70B Instruct.',
+    family: 'Llama 3.3 70B Instruct',
+    vendor: 'meta',
+    description: 'Meta’s Llama 3.3 70B, addressed by its own name.',
     priceFactor: 1,
     contextWindow: 131072,
     upstream: {
@@ -41,7 +51,10 @@ export const CATALOGUE: CatalogueModel[] = [
   },
   {
     id: 'qseal-deepseek-r1',
-    description: 'DeepSeek R1 reasoning model.',
+    family: 'DeepSeek R1',
+    familyByProvider: { groq: 'DeepSeek R1 Distill Llama 70B' },
+    vendor: 'deepseek',
+    description: 'Reasoning model that thinks before it answers.',
     priceFactor: 2,
     contextWindow: 65536,
     upstream: {
@@ -53,7 +66,9 @@ export const CATALOGUE: CatalogueModel[] = [
   },
   {
     id: 'qseal-llama-3.1-8b',
-    description: 'Small, fast Llama 3.1 8B Instruct.',
+    family: 'Llama 3.1 8B Instruct',
+    vendor: 'meta',
+    description: 'Small and fast, for simple, high-volume tasks.',
     priceFactor: 0.5,
     contextWindow: 131072,
     upstream: {
@@ -78,6 +93,12 @@ export function upstreamModelFor(id: string): string | undefined {
   if (!provider || !hasUpstream()) return config.allowDevBypass ? 'dev-engine' : undefined;
   if (provider === 'custom') return customMap()[id];
   return CATALOGUE.find((m) => m.id === id)?.upstream[provider];
+}
+
+/** The underlying model's name as served by the active provider. */
+export function familyFor(m: CatalogueModel): string {
+  const p = config.upstreamProvider;
+  return (p && hasUpstream() && m.familyByProvider?.[p]) || m.family;
 }
 
 export function priceFor(id: string): number {

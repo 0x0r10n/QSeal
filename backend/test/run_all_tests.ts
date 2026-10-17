@@ -110,6 +110,7 @@ async function runTests() {
     assert(m, 'qseal-quantum-70b missing');
     assert(m.pricing.price_per_request_usdc > 0, 'pricing missing');
     assert(m.served_by.provider === 'dev-engine', `served_by ${JSON.stringify(m.served_by)}`);
+    assert(m.vendor === 'meta' && m.family === 'Llama 3.3 70B Instruct', `vendor/family ${m.vendor} ${m.family}`);
   });
 
   let challenge: any;

@@ -7,6 +7,10 @@ export interface ModelInfo {
   ownedBy?: string
   created?: number
   description?: string
+  /** Underlying model, e.g. "Llama 3.3 70B Instruct". */
+  family?: string
+  /** Vendor of the underlying model, e.g. "meta". */
+  vendor?: string
   priceUsdc?: number
   contextWindow?: number
   servedBy?: { provider?: string; upstreamModel?: string }

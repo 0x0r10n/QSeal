@@ -6,66 +6,73 @@ import { SpotlightCard } from '@/components/ui/SpotlightCard'
 import { Reveal, RevealItem } from '@/components/ui/Reveal'
 import { AvailabilityTag, StatusTag } from '@/components/ui/StatusTag'
 import { QEmblem } from '@/components/brand/QEmblem'
+import { ModelLogo } from '@/components/brand/ModelLogo'
+import { MODEL_CATALOGUE, VENDOR_NAME, formatContext } from '@/content/models'
+import { cn } from '@/lib/cn'
 import { useModels } from '@/hooks/useModels'
 import { backendMode } from '@/lib/env'
 import { EASE } from '@/lib/motion'
 
 function ModelsTile() {
   const q = useModels()
-  const models = q.data ?? []
+  const live = new Map((q.data ?? []).map((m) => [m.id, m]))
   let status: React.ReactNode
-  if (backendMode === 'unconfigured') status = <StatusTag tone="muted">Not connected</StatusTag>
+  if (backendMode === 'unconfigured') status = <StatusTag tone="neutral" dot={false}>{MODEL_CATALOGUE.length} models</StatusTag>
   else if (backendMode === 'mock') status = <StatusTag tone="warn">Sample data</StatusTag>
-  else if (q.isPending) status = <StatusTag tone="info" pulse>Loading</StatusTag>
-  else if (q.isError) status = <StatusTag tone="bad">Unreachable</StatusTag>
-  else status = <StatusTag tone="ok" pulse>Live · {models.length}</StatusTag>
+  else if (q.isPending) status = <StatusTag tone="info" pulse>Checking</StatusTag>
+  else if (q.isError) status = <StatusTag tone="bad">Gateway unreachable</StatusTag>
+  else status = <StatusTag tone="ok" pulse>Live · {live.size} available</StatusTag>
 
   return (
     <SpotlightCard className="flex h-full flex-col p-7 sm:p-9">
       <div className="flex flex-col-reverse items-start justify-between gap-4 sm:flex-row">
         <div>
-          <p className="eyebrow">Model catalogue</p>
-          <h3 className="mt-4 max-w-sm text-2xl font-medium tracking-[-0.03em] text-steel-50 sm:text-[28px]">
-            Choose from the models the network actually serves.
+          <p className="eyebrow">Models</p>
+          <h3 className="mt-4 max-w-md text-2xl font-medium tracking-[-0.03em] text-steel-50 sm:text-[28px]">
+            Leading open models from Meta and DeepSeek.
           </h3>
         </div>
         {status}
       </div>
-      <div className="mt-10 flex-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-ink-950/50">
-        <div className="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3 font-mono text-[11px] text-steel-500">
-          <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-steel-300">GET</span>/v1/models
-        </div>
-        <ul className="divide-y divide-white/[0.05]">
-          {models.length > 0
-            ? models.slice(0, 5).map((m, i) => (
-                <motion.li
-                  key={m.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.06, duration: 0.5, ease: EASE }}
-                  className="flex items-center justify-between px-4 py-3 font-mono text-[12.5px]"
-                >
-                  <span className="truncate text-steel-100">{m.id}</span>
-                  {m.ownedBy && <span className="ml-4 shrink-0 text-steel-600">{m.ownedBy}</span>}
-                </motion.li>
-              ))
-            : Array.from({ length: 4 }).map((_, i) => (
-                <li key={i} className="flex items-center gap-4 px-4 py-3.5">
-                  <span className="h-2 rounded-full bg-white/[0.06]" style={{ width: `${46 - i * 7}%` }} />
-                  <span className="ml-auto h-2 w-12 rounded-full bg-white/[0.04]" />
-                </li>
-              ))}
-        </ul>
-        {models.length === 0 && (
-          <p className="border-t border-white/[0.05] px-4 py-3 text-[12.5px] text-steel-500">
-            {backendMode === 'unconfigured'
-              ? 'Connect a backend to list live models. Nothing here is pre-filled.'
-              : q.isError
-                ? 'The catalogue could not be loaded right now.'
-                : 'Loading the catalogue…'}
-          </p>
-        )}
-      </div>
+      <ul className="mt-9 flex-1 divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/[0.07] bg-ink-950/50">
+        {MODEL_CATALOGUE.map((m, i) => {
+          const l = live.get(m.id)
+          const offline = backendMode === 'live' && q.isSuccess && !l
+          return (
+            <motion.li
+              key={m.id}
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.06, duration: 0.5, ease: EASE }}
+              className={cn('flex items-center gap-4 px-4 py-3.5 sm:px-5', offline && 'opacity-50')}
+            >
+              <ModelLogo vendor={m.vendor} />
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14.5px] font-medium text-steel-50">
+                  {l?.family ?? m.family}
+                  {m.tags.map((t) => (
+                    <span key={t} className="rounded-full border border-white/10 px-1.5 py-px font-mono text-[9.5px] font-normal uppercase tracking-[0.08em] text-steel-400">
+                      {t}
+                    </span>
+                  ))}
+                </p>
+                <p className="mt-0.5 truncate font-mono text-[11.5px] text-steel-500">
+                  {m.id} · {VENDOR_NAME[m.vendor]} · {formatContext(m.contextWindow)}
+                </p>
+              </div>
+              <span className="hidden shrink-0 text-right font-mono text-[11.5px] text-steel-300 sm:block">
+                {l?.priceUsdc !== undefined ? `${l.priceUsdc} USDC` : offline ? 'Not served' : ''}
+              </span>
+            </motion.li>
+          )
+        })}
+      </ul>
+      <p className="mt-4 text-[12.5px] leading-relaxed text-steel-500">
+        {backendMode === 'live' && q.isSuccess
+          ? 'Live from GET /v1/models: price per request and availability on this gateway.'
+          : 'Each model is served by the deployment’s configured provider. Prices per request appear once the app is connected.'}
+      </p>
     </SpotlightCard>
   )
 }
@@ -203,7 +210,7 @@ export function CapabilitiesSection() {
           }
           lede="Models, requests, receipts, payments and programmatic access — the capabilities that make up QSeal today."
         />
-        <Reveal className="mt-16 grid gap-4 lg:grid-cols-6 lg:grid-rows-[auto_auto]" gap={0.1}>
+        <Reveal className="mt-16 grid gap-4 lg:grid-cols-6 lg:grid-rows-[auto_auto] [&>*]:min-w-0" gap={0.1}>
           <RevealItem className="lg:col-span-4">
             <ModelsTile />
           </RevealItem>

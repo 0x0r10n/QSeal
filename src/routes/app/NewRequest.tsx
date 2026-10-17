@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, CornerDownLeft, KeyRound, Lock, LockOpen, ScanLine, Square, Wallet } from 'lucide-react'
 import { PageHeader, Panel, StatePanel, fieldClass } from '@/components/application/ui'
 import { WalletMenu } from '@/components/application/WalletMenu'
+import { ModelLogo } from '@/components/brand/ModelLogo'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { StatusTag } from '@/components/ui/StatusTag'
 import { Code, CopyButton } from '@/components/ui/CodeBlock'
@@ -73,7 +74,8 @@ export default function NewRequest() {
     }
   }, [extra])
 
-  const price = models.data?.find((m) => m.id === model)?.priceUsdc
+  const selected = models.data?.find((m) => m.id === model)
+  const price = selected?.priceUsdc
   const ready = Boolean(model && prompt.trim())
   const busy = chamber.phase === 'sending' || chamber.phase === 'paying'
   const paymentReady = backendMode === 'mock' || (method === 'key' && key) || (method === 'wallet' && account)
@@ -210,6 +212,7 @@ export default function NewRequest() {
           >
             <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-3">
               <label htmlFor="model" className="sr-only">Model</label>
+              <ModelLogo vendor={selected?.vendor} size="sm" />
               <div className="relative">
                 <select
                   id="model"
@@ -219,7 +222,7 @@ export default function NewRequest() {
                     setUnusedPayment(null)
                   }}
                   disabled={modelOptions.length === 0 || busy}
-                  className={cn(fieldClass, 'h-9 min-w-[210px] appearance-none pr-9 font-mono text-[12.5px]')}
+                  className={cn(fieldClass, 'h-9 min-w-[210px] max-w-[min(100%,360px)] appearance-none truncate pr-9 text-[12.5px]')}
                 >
                   {modelOptions.length === 0 && (
                     <option value="">
@@ -227,7 +230,7 @@ export default function NewRequest() {
                     </option>
                   )}
                   {modelOptions.map((m) => (
-                    <option key={m.id} value={m.id}>{m.id}</option>
+                    <option key={m.id} value={m.id}>{m.family ? `${m.family} · ${m.id}` : m.id}</option>
                   ))}
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-steel-500" />

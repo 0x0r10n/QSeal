@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { config, hasUpstream } from '../config.js';
-import { availableModels, priceFor, upstreamModelFor } from '../catalogue.js';
+import { availableModels, familyFor, priceFor, upstreamModelFor } from '../catalogue.js';
 
 export function handleListModels(_req: Request, res: Response) {
   const provider = hasUpstream() ? config.upstreamProvider : config.allowDevBypass ? 'dev-engine' : undefined;
@@ -11,6 +11,8 @@ export function handleListModels(_req: Request, res: Response) {
       object: 'model',
       created: 1715000000,
       owned_by: 'qseal',
+      family: familyFor(m),
+      vendor: m.vendor,
       description: m.description,
       pricing: { price_per_request_usdc: priceFor(m.id), scheme: 'exact', currency: 'USDC' },
       capabilities: {

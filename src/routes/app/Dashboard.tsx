@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, ArrowUpRight, Boxes, KeyRound, Plus, ScanLine, Wallet } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, KeyRound, Plus, ScanLine, Wallet } from 'lucide-react'
+import { ModelLogo } from '@/components/brand/ModelLogo'
 import { PageHeader, Panel, Skeleton, StatePanel, ErrorState } from '@/components/application/ui'
 import { BackendStatusPill } from '@/components/application/BackendStatus'
 import { ButtonLink } from '@/components/ui/Button'
@@ -217,8 +218,10 @@ export default function Dashboard() {
         ) : (
           <ul className="flex flex-wrap gap-2 p-5">
             {models.data.slice(0, 12).map((m) => (
-              <li key={m.id} className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 font-mono text-[12px] text-steel-200">
-                <Boxes className="size-3.5 text-steel-500" /> {m.id}
+              <li key={m.id} className="inline-flex items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] py-1.5 pl-1.5 pr-3.5">
+                <ModelLogo vendor={m.vendor} size="sm" />
+                <span className="text-[12.5px] text-steel-100">{m.family ?? m.id}</span>
+                {m.priceUsdc !== undefined && <span className="font-mono text-[11px] text-steel-500">{m.priceUsdc} USDC</span>}
               </li>
             ))}
           </ul>
