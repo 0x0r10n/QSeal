@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowUpRight, ChevronDown, Loader2, LogOut, Wallet } from 'lucide-react'
-import { connectWallet, disconnectWallet, refreshWallets, shortAddress, useWallet } from '@/services/wallet/wallet'
+import { connectWallet, disconnectWallet, refreshWallets, shortAddress, useWallet, openInWalletLinks } from '@/services/wallet/wallet'
 import { useHealth } from '@/hooks/useGateway'
 import { EASE } from '@/lib/motion'
 import { cn } from '@/lib/cn'
+
+// Phone browsers have no wallet extension; the wallet apps can reopen this page in their own browser instead.
+const isPhone = () =>
+  typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)))
 
 const INSTALL = [
   { name: 'Phantom', href: 'https://phantom.com/download' },
@@ -137,7 +141,20 @@ export function WalletMenu({ variant = 'pill', align = 'right' }: { variant?: 'p
             ) : (
               <div className="px-3 py-2">
                 <p className="text-[13px] text-steel-200">No Solana wallet found in this browser.</p>
-                <p className="mt-1 text-[12px] text-steel-500">Install one, then reload this page.</p>
+                {isPhone() && (
+                  <ul className="mt-3 space-y-2">
+                    {openInWalletLinks(window.location.href).map((w) => (
+                      <li key={w.name}>
+                        <a href={w.href} className="flex h-10 items-center justify-between rounded-lg border border-white/10 px-3 text-[13px] text-steel-100 hover:border-white/20">
+                          Open in {w.name} <ArrowUpRight className="size-3.5" />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className={cn('text-[12px] text-steel-500', isPhone() ? 'mt-3' : 'mt-1')}>
+                  {isPhone() ? 'Or install one, then reload this page.' : 'Install one, then reload this page.'}
+                </p>
                 <ul className="mt-3 space-y-1">
                   {INSTALL.map((w) => (
                     <li key={w.name}>

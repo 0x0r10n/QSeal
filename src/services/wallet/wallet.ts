@@ -49,6 +49,13 @@ let state: WalletState = {
   error: null,
 }
 
+export const getWalletState = (): WalletState => state
+
+// The connected wallet's account-change subscription (Wallet Standard `on` returns its own off function).
+let offChange: (() => void) | undefined
+// Phantom's docs only show how to subscribe, so its listeners are attached once and check which wallet is connected.
+let phantomWired = false
+
 const listeners = new Set<() => void>()
 const set = (patch: Partial<WalletState>) => {
   state = { ...state, ...patch }
@@ -254,7 +261,34 @@ function cleanWalletError(err: WalletError, walletName: string = 'Phantom'): str
   return msg || `${walletName} refused the connection.`
 }
 
+const CONNECT_TIMEOUT_MS = 60_000
+const SILENT_TIMEOUT_MS = 10_000
+
+/**
+ * Connect, but never wait forever: a wallet whose popup was closed without an answer can leave
+ * the promise pending, which would keep the UI (and AuthGuard) on "Connecting…".
+ */
 export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } = {}) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const attempt = connectOnce(wallet, opts)
+  const timedOut = new Promise<'timeout'>((r) => {
+    timer = setTimeout(() => r('timeout'), opts.silent ? SILENT_TIMEOUT_MS : CONNECT_TIMEOUT_MS)
+  })
+  try {
+    if ((await Promise.race([attempt, timedOut])) !== 'timeout') return
+  } finally {
+    clearTimeout(timer)
+  }
+  // If the wallet answers later, connectOnce still completes the connection.
+  attempt.catch(() => {})
+  set({ connecting: false, connectingWalletName: null })
+  if (opts.silent) return
+  const msg = `${wallet.name} didn't respond. Open the extension to unlock and approve, then try again.`
+  set({ error: msg })
+  throw new Error(msg)
+}
+
+async function connectOnce(wallet: Wallet, opts: { silent?: boolean }) {
   const isPhantom = wallet.name.toLowerCase().includes('phantom')
   const isSolflare = wallet.name.toLowerCase().includes('solflare')
 
@@ -376,9 +410,12 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
     writeJSON(local, LAST, wallet.name)
 
     // Wire up events if Phantom
-    if (isPhantom) {
-      const phantom = getPhantomProvider()
-      phantom?.on?.('accountChanged', (publicKey: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const phantom = isPhantom && !phantomWired ? getPhantomProvider() : null
+    if (phantom?.on) {
+      phantomWired = true
+      const phantomConnected = () => Boolean(state.wallet?.name.toLowerCase().includes('phantom'))
+      phantom.on('accountChanged', (publicKey: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        if (!phantomConnected()) return
         if (publicKey) {
           const pubkeyStr = publicKey.toString()
           set({
@@ -393,12 +430,13 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
           set({ account: null, wallet: null })
         }
       })
-      phantom?.on?.('disconnect', () => {
-        set({ account: null, wallet: null })
+      phantom.on('disconnect', () => {
+        if (phantomConnected()) set({ account: null, wallet: null })
       })
     }
 
-    features[EVENTS]?.on?.('change', ({ accounts: next }: { accounts?: readonly WalletAccount[] }) => {
+    offChange?.()
+    offChange = features[EVENTS]?.on?.('change', ({ accounts: next }: { accounts?: readonly WalletAccount[] }) => {
       if (next) set({ account: next[0] ?? null, wallet: next[0] ? wallet : null })
     })
   } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -413,6 +451,8 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
 }
 
 export async function disconnectWallet() {
+  offChange?.()
+  offChange = undefined
   const features = state.wallet?.features as Features | undefined
   try {
     await features?.[DISCONNECT]?.disconnect()
@@ -508,6 +548,20 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
   }
 
   throw new Error(`${wallet.name} does not support signing and sending Solana transactions`)
+}
+
+/**
+ * Reopen a page inside a wallet's in-app browser, for phones with no injected wallet.
+ * Formats: https://docs.phantom.com/phantom-deeplinks/other-methods/browse and
+ * https://docs.solflare.com/solflare/technical/deeplinks/other-methods/browse
+ */
+export function openInWalletLinks(pageUrl: string): Array<{ name: string; href: string }> {
+  const url = encodeURIComponent(pageUrl)
+  const ref = encodeURIComponent(new URL(pageUrl).origin)
+  return [
+    { name: 'Phantom', href: `https://phantom.com/ul/browse/${url}?ref=${ref}` },
+    { name: 'Solflare', href: `https://solflare.com/ul/v1/browse/${url}?ref=${ref}` },
+  ]
 }
 
 export const shortAddress = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`

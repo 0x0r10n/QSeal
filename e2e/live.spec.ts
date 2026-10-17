@@ -73,6 +73,8 @@ test('shows real catalogue data and the development-mode warning', async ({ page
 })
 
 test('wallet: connect, pay per request, and keep an unused payment for retry', async ({ page }) => {
+  // The gateway's confirmation polling goes to the public devnet RPC, whose latency varies.
+  test.setTimeout(120_000)
   // Register a Wallet Standard wallet the way browser extensions do.
   await page.addInitScript(() => {
     const account = {
@@ -127,7 +129,7 @@ test('wallet: connect, pay per request, and keep an unused payment for retry', a
 
   // The gateway received the wallet's signature as an x402 payment (and could not confirm it here).
   // The gateway polls for on-chain confirmation for up to 20 s (CONFIRM_WAIT_MS) before refusing.
-  await expect(page.getByRole('alert')).toContainText('Payment required', { timeout: 30_000 })
+  await expect(page.getByRole('alert')).toContainText('Payment required', { timeout: 60_000 })
   expect(JSON.parse(Buffer.from(paymentHeader!, 'base64').toString())).toMatchObject({
     x402Version: 2,
     reference: 'Ref1111111111111111111111111111111111111111',
