@@ -25,7 +25,7 @@ export default function Security() {
             Precise claims. <span className="text-steel-500">Nothing implied.</span>
           </>
         }
-        lede="Security is a set of specific properties with specific boundaries. Here is each layer of QSeal, what it protects, and what it does not."
+        lede="Security is a set of specific properties with specific boundaries. Here is each layer of QRouter, what it protects, and what it does not."
       />
 
       <Container className="py-20 md:py-28">
@@ -59,7 +59,7 @@ export default function Security() {
 
         <div className="mt-20">
           <Prose title="Explicitly not claimed">
-            <p>QSeal does not claim any of the following:</p>
+            <p>QRouter does not claim any of the following:</p>
             <ul className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
               {NOT_CLAIMED.map((c) => (
                 <li key={c} className="flex items-center gap-4 py-3.5 text-steel-300">
@@ -70,8 +70,8 @@ export default function Security() {
           </Prose>
           <Prose title="Why wallets are a separate layer">
             <p>
-              Solana accounts are secured by Ed25519 signatures, a classical scheme. QSeal uses wallets to establish identity and to
-              settle payments. That is a different job from protecting the integrity of inference records, which is where QSeal’s
+              Solana accounts are secured by Ed25519 signatures, a classical scheme. QRouter uses wallets to establish identity and to
+              settle payments. That is a different job from protecting the integrity of inference records, which is where QRouter’s
               post-quantum design applies. Keeping the layers separate keeps each claim honest.
             </p>
           </Prose>

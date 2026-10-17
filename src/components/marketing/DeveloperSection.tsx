@@ -6,7 +6,7 @@ import { Reveal, RevealItem } from '@/components/ui/Reveal'
 
 const STEPS = [
   ['Get access', 'Connect a Solana wallet or use a prepaid key.'],
-  ['Point your client', 'Use the QSeal base URL with any OpenAI-compatible client.'],
+  ['Point your client', 'Use the QRouter base URL with any OpenAI-compatible client.'],
   ['Keep the receipt', 'Store the signed receipt next to the response for later verification.'],
 ]
 
@@ -26,7 +26,7 @@ export function DeveloperSection() {
                   Familiar API. <span className="text-steel-500">Stronger guarantees.</span>
                 </>
               }
-              lede="If your code already speaks the OpenAI chat-completions dialect, it is a base-URL change away from QSeal."
+              lede="If your code already speaks the OpenAI chat-completions dialect, it is a base-URL change away from QRouter."
             />
             <Reveal as="ol" className="mt-12 space-y-0" gap={0.1}>
               {STEPS.map(([t, b], i) => (

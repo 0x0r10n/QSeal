@@ -156,7 +156,7 @@ export default function Verify() {
                               {k === 'valid' && 'Both signatures check out against the gateway’s published keys.'}
                               {k === 'invalid' && 'A signature fails, the content was altered, or it was signed with other keys.'}
                               {k === 'unable' && 'The gateway’s keys could not be fetched, so nothing was checked.'}
-                              {k === 'unsupported' && 'Not a QSeal receipt or receipt ID.'}
+                              {k === 'unsupported' && 'Not a QRouter receipt or receipt ID.'}
                             </p>
                           </div>
                         </li>

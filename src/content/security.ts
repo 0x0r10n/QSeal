@@ -40,7 +40,7 @@ export const SECURITY_LAYERS: SecurityLayer[] = [
     name: 'Inference execution',
     short: 'Routed to a named provider and model, never silently substituted.',
     covers:
-      'Each QSeal model maps to a specific upstream model, and GET /v1/models shows which provider and model serve it. If the provider fails, the request fails and the charge is refunded.',
+      'Each QRouter model maps to a specific upstream model, and GET /v1/models shows which provider and model serve it. If the provider fails, the request fails and the charge is refunded.',
     notClaimed: 'Trusted execution environments (TEEs), remote attestation, or control over how the provider runs or stores requests.',
     status: 'available',
   },

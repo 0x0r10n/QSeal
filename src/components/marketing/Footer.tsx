@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowUpRight } from 'lucide-react'
 import { Wordmark } from '@/components/brand/QEmblem'
+import { XLogo } from '@/components/brand/XLogo'
 
 const COLS: Array<{ title: string; links: Array<{ label: string; to: string; external?: boolean }> }> = [
   {
@@ -40,6 +41,17 @@ export function Footer() {
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-steel-500">
             Private, verifiable AI inference for developers and autonomous agents.
           </p>
+          <div className="mt-6">
+            <a
+              href="https://x.com/QRouter_"
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label="Follow @QRouter_ on X (formerly Twitter)"
+              className="group/x relative inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-steel-400 backdrop-blur-sm transition-all duration-300 hover:border-white/25 hover:bg-white/[0.08] hover:text-white hover:shadow-[0_0_20px_-3px_rgba(255,255,255,0.15)] active:scale-95"
+            >
+              <XLogo size={14} className="transition-transform duration-300 group-hover/x:scale-110" />
+            </a>
+          </div>
         </div>
         {COLS.map((col) => (
           <nav key={col.title} aria-label={col.title}>
@@ -67,10 +79,6 @@ export function Footer() {
             </ul>
           </nav>
         ))}
-      </div>
-      <div className="mx-auto flex max-w-[1400px] flex-col gap-3 border-t border-white/[0.05] px-5 py-6 text-xs text-steel-600 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
-        <p>© {new Date().getFullYear()} QSeal.</p>
-        <p>Privacy policy and terms of service are published with the production deployment.</p>
       </div>
     </footer>
   )

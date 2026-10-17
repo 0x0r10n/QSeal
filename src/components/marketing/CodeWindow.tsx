@@ -56,7 +56,7 @@ export function CodeWindow({ className }: { className?: string }) {
       </div>
       <div className="flex items-center justify-between border-t border-white/[0.07] px-4 py-2.5 font-mono text-[10.5px] text-steel-600">
         <span>{current.file}</span>
-        <span className="hidden sm:inline">Set QSEAL_API_URL and QSEAL_KEY, then run</span>
+        <span className="hidden sm:inline">Set QROUTER_API_URL and key, then run</span>
       </div>
     </div>
   )

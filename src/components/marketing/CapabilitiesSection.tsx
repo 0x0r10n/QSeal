@@ -182,7 +182,7 @@ function PaymentsTile() {
         ))}
       </div>
       <p className="mt-5 text-[12.5px] leading-relaxed text-steel-600">
-        Failed requests are refunded automatically. Wallet signatures are classical (Ed25519) and sit outside QSeal’s post-quantum design.
+        Failed requests are refunded automatically. Wallet signatures are classical (Ed25519) and sit outside QRouter’s post-quantum design.
       </p>
     </SpotlightCard>
   )
@@ -212,7 +212,7 @@ function EndpointsTile() {
         ))}
       </ul>
       <p className="mt-5 text-[12.5px] leading-relaxed text-steel-600">
-        Point the OpenAI SDK at QSeal with a prepaid key, or plug the MCP endpoint into an agent framework.
+        Point the OpenAI SDK at QRouter with a prepaid key, or plug the MCP endpoint into an agent framework.
       </p>
     </SpotlightCard>
   )
@@ -228,10 +228,10 @@ export function CapabilitiesSection() {
           titleId="product-title"
           title={
             <>
-              Everything you need to <span className="text-chrome">seal</span> an inference.
+              Everything you need to <span className="text-chrome">route and secure</span> an inference.
             </>
           }
-          lede="Models, requests, receipts, payments and programmatic access — the capabilities that make up QSeal today."
+          lede="Models, requests, receipts, payments and programmatic access — the capabilities that make up QRouter today."
         />
         <Reveal className="mt-16 grid gap-4 lg:grid-cols-6 lg:grid-rows-[auto_auto] [&>*]:min-w-0" gap={0.1}>
           <RevealItem className="lg:col-span-4">

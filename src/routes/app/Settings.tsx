@@ -112,7 +112,7 @@ export default function Settings() {
             <Row label="Prepaid key" hint={key ? 'Stored for this tab only.' : 'No key in this session.'}>
               {key ? <span className="font-mono text-[12.5px] text-steel-200">{maskKey(key)}</span> : <ButtonLink to="/app/keys" size="sm" variant="secondary">Add key</ButtonLink>}
             </Row>
-            <Row label="Accounts" hint="QSeal has no username or password. Your wallet and prepaid keys are your identity.">
+            <Row label="Accounts" hint="QRouter has no username or password. Your wallet and prepaid keys are your identity.">
               <StatusTag tone="neutral" dot={false}>Accountless</StatusTag>
             </Row>
           </Panel>
@@ -120,7 +120,7 @@ export default function Settings() {
 
         <div id="wallet" className="scroll-mt-20">
           <Panel title="Wallet">
-            <Row label="Solana wallet" hint="Used to pay per request and to buy or top up prepaid keys. QSeal never holds your wallet keys.">
+            <Row label="Solana wallet" hint="Used to pay per request and to buy or top up prepaid keys. QRouter never holds your wallet keys.">
               <div className="w-64">
                 <WalletMenu variant="block" />
               </div>

@@ -84,7 +84,7 @@ export function Wordmark({ className, compact = false }: { className?: string; c
   return (
     <span className={cn('flex items-center gap-2.5', className)}>
       <QEmblem className="h-[26px] w-auto" detail="mark" />
-      {!compact && <span className="text-[16px] font-semibold leading-none tracking-[-0.02em] text-steel-50">QSeal</span>}
+      {!compact && <span className="text-[16px] font-semibold leading-none tracking-[-0.02em] text-steel-50">QRouter</span>}
     </span>
   )
 }

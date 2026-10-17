@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType } from 'react'
 import { createBrowserRouter, createHashRouter } from 'react-router-dom'
 import { MarketingLayout } from '@/layouts/MarketingLayout'
 import { AppLayout } from '@/layouts/AppLayout'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 import Home from '@/routes/marketing/Home'
 
 type Loader = () => Promise<{ default: ComponentType }>
@@ -44,7 +45,11 @@ export const router = createRouter([
   },
   {
     path: '/app',
-    element: <AppLayout />,
+    element: (
+      <AuthGuard>
+        <AppLayout />
+      </AuthGuard>
+    ),
     children: [
       { index: true, element: page(() => import('@/routes/app/Dashboard')) },
       { path: 'new', element: page(() => import('@/routes/app/NewRequest')) },

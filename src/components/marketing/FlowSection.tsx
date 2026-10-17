@@ -30,7 +30,7 @@ const STEPS: Array<{ title: string; body: string; icon: typeof Send; status: Ava
   },
   {
     title: 'Verification',
-    body: 'Anyone holding the receipt can check it against QSeal’s published keys, in the app, through the API, or offline.',
+    body: 'Anyone holding the receipt can check it against QRouter’s published keys, in the app, through the API, or offline.',
     icon: ScanLine,
     status: 'available',
     code: '/.well-known/qseal-keys.json',
@@ -50,7 +50,7 @@ export function FlowSection() {
         <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
           <SectionHeader
             index="02"
-            eyebrow="How QSeal works"
+            eyebrow="How QRouter works"
             titleId="flow-title"
             title={
               <>

@@ -49,9 +49,9 @@ export function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; 
   return (
     <div className="flex h-full flex-col">
       <div className={cn('flex h-14 items-center px-4', collapsed && 'lg:justify-center lg:px-0')}>
-        <Link to="/" className="flex items-center gap-2.5 rounded-md" aria-label="QSeal home">
+        <Link to="/" className="flex items-center gap-2.5 rounded-md" aria-label="QRouter home">
           <QEmblem className="h-[22px] w-auto" detail="mark" />
-          <span className={cn('text-[15px] font-semibold tracking-[-0.02em] text-steel-50', collapsed && 'lg:hidden')}>QSeal</span>
+          <span className={cn('text-[15px] font-semibold tracking-[-0.02em] text-steel-50', collapsed && 'lg:hidden')}>QRouter</span>
         </Link>
       </div>
       <nav aria-label="Application" className="flex flex-1 flex-col gap-0.5 px-2.5 pt-3">

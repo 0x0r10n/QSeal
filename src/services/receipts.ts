@@ -54,7 +54,7 @@ export async function verifyReceipt(text: string): Promise<VerificationOutcome> 
   }
 
   if (!isReceiptShape(candidate)) {
-    return { status: 'unsupported', summary: 'Unsupported format', reason: 'This JSON is not a QSeal receipt (missing id, version, payment or pqc signatures).' }
+    return { status: 'unsupported', summary: 'Unsupported format', reason: 'This JSON is not a QRouter receipt (missing id, version, payment or pqc signatures).' }
   }
   const receipt = candidate
 

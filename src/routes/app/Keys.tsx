@@ -319,7 +319,7 @@ function BuyKey({ minDeposit, network, hasKey }: { minDeposit: number; network?:
         ) : (
           <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <p className="text-[13px] leading-relaxed text-steel-400">
-              Pays USDC from your wallet to the QSeal treasury. The key is credited with the amount that arrives on-chain. Minimum{' '}
+              Pays USDC from your wallet to the QRouter treasury. The key is credited with the amount that arrives on-chain. Minimum{' '}
               {usdc(minDeposit)}.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-2">

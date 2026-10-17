@@ -10,7 +10,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 const GUIDES = [
   { icon: KeyRound, title: 'Get a key', body: 'Buy a prepaid key with USDC.', href: '#access' },
-  { icon: Boxes, title: 'Quickstart', body: 'Call QSeal with the OpenAI SDK.', href: '#quickstart' },
+  { icon: Boxes, title: 'Quickstart', body: 'Call QRouter with the OpenAI SDK.', href: '#quickstart' },
   { icon: CreditCard, title: 'Pay per request', body: 'x402 USDC payments on Solana.', href: '#x402' },
   { icon: Lock, title: 'Sealed prompts', body: 'ML-KEM-768 + AES-256-GCM.', href: '#sealing' },
   { icon: ScanLine, title: 'Receipts', body: 'Verify ML-DSA-65 signatures.', href: '#receipts' },
@@ -62,7 +62,7 @@ export default function Docs() {
         eyebrow="Documentation"
         title={
           <>
-            Build with <span className="text-chrome">QSeal.</span>
+            Build with <span className="text-chrome">QRouter.</span>
           </>
         }
         lede="Call the API with the OpenAI SDK you already use, pay in USDC on Solana, and keep a verifiable receipt for every answer."

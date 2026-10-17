@@ -10,6 +10,8 @@ export function bytesToHex(bytes: Uint8Array): string {
 }
 
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+const B58_MAP: Record<string, number> = {}
+for (let i = 0; i < B58.length; i++) B58_MAP[B58[i]] = i
 
 /** Base58 (Bitcoin alphabet), used for Solana signatures and addresses. */
 export function toBase58(bytes: Uint8Array): string {
@@ -30,6 +32,28 @@ export function toBase58(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length && bytes[i] === 0; i++) out += '1'
   for (let i = digits.length - 1; i >= 0; i--) out += B58[digits[i]]
   return out
+}
+
+export function fromBase58(str: string): Uint8Array {
+  const bytes = [0]
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i]
+    if (B58_MAP[c] === undefined) throw new Error('Invalid base58 character')
+    for (let j = 0; j < bytes.length; j++) bytes[j] *= 58
+    bytes[0] += B58_MAP[c]
+    let carry = 0
+    for (let j = 0; j < bytes.length; j++) {
+      bytes[j] += carry
+      carry = bytes[j] >> 8
+      bytes[j] &= 0xff
+    }
+    while (carry) {
+      bytes.push(carry & 0xff)
+      carry >>= 8
+    }
+  }
+  for (let i = 0; i < str.length && str[i] === '1'; i++) bytes.push(0)
+  return new Uint8Array(bytes.reverse())
 }
 
 export function base64ToBytes(b64: string): Uint8Array {

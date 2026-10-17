@@ -1,5 +1,5 @@
 /**
- * The models QSeal offers, for pages that render without a gateway (the
+ * The models QRouter offers, for pages that render without a gateway (the
  * marketing site). Mirrors backend/src/catalogue.ts; a unit test keeps the
  * two in sync. Prices are deployment-specific, so they only come from the
  * live API.

@@ -40,8 +40,9 @@ export function authHeaders(): Record<string, string> {
   return k ? { Authorization: `Bearer ${k}` } : {}
 }
 
-export const looksLikeKey = (k: string) => /^qseal_sk_[a-f0-9]{48}$/.test(k.trim())
+export const looksLikeKey = (k: string) => /^(qrouter_sk_|qseal_sk_)[a-f0-9]{32,64}$/i.test(k.trim())
 
 export function maskKey(k: string): string {
-  return k.length <= 14 ? '••••' : `${k.slice(0, 13)}…${k.slice(-4)}`
+  const trimmed = k.trim()
+  return trimmed.length <= 14 ? '••••' : `${trimmed.slice(0, 14)}…${trimmed.slice(-4)}`
 }

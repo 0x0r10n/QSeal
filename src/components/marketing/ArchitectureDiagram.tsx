@@ -7,7 +7,7 @@ import { useReducedMotion } from '@/hooks/useMediaQuery'
  */
 const NODES = [
   { id: 'client', x: 40, y: 150, w: 170, label: 'Client / Agent', sub: 'App, SDK, autonomous agent' },
-  { id: 'api', x: 300, y: 150, w: 170, label: 'QSeal gateway', sub: 'unseal · route · sign' },
+  { id: 'api', x: 300, y: 150, w: 170, label: 'QRouter gateway', sub: 'unseal · route · sign' },
   { id: 'infer', x: 560, y: 70, w: 190, label: 'Model provider', sub: 'Groq, OpenRouter, …' },
   { id: 'receipt', x: 560, y: 230, w: 190, label: 'Receipt', sub: 'ML-DSA-65 + Ed25519' },
   { id: 'verify', x: 820, y: 230, w: 150, label: 'Verifier', sub: 'Anyone, offline' },
@@ -44,9 +44,9 @@ export function ArchitectureDiagram() {
     <figure className="surface overflow-hidden rounded-3xl p-4 sm:p-8">
       <div className="scrollbar-thin overflow-x-auto">
         <svg viewBox="0 0 1010 420" className="min-w-[720px]" role="img" aria-labelledby="arch-title arch-desc">
-          <title id="arch-title">QSeal architecture</title>
+          <title id="arch-title">QRouter architecture</title>
           <desc id="arch-desc">
-            A client sends a request, optionally sealed with ML-KEM-768, to the QSeal gateway. The gateway verifies payment on Solana,
+            A client sends a request, optionally sealed with ML-KEM-768, to the QRouter gateway. The gateway verifies payment on Solana,
             unseals the request in memory, forwards it to the model provider, and returns the answer with a signed receipt that
             anyone can verify.
           </desc>

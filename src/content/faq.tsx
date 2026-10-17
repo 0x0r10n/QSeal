@@ -3,14 +3,14 @@ import { AvailabilityTag } from '@/components/ui/StatusTag'
 
 export const FAQ: AccordionItem[] = [
   {
-    q: 'What is QSeal, in one sentence?',
+    q: 'What is QRouter, in one sentence?',
     meta: <AvailabilityTag value="available" />,
     a: 'An OpenAI-compatible AI inference gateway, paid in USDC on Solana, that can seal your prompt with post-quantum encryption and returns a post-quantum signed receipt with every answer.',
   },
   {
     q: 'Who can see my prompt?',
     meta: <AvailabilityTag value="available" />,
-    a: 'The QSeal gateway decrypts it in memory to run the request and does not store or log it. It then forwards the prompt to the model provider serving your chosen model, which handles it under its own data policy. The Models page shows which provider that is. QSeal does not claim end-to-end encryption to the model or trusted execution.',
+    a: 'The QRouter gateway decrypts it in memory to run the request and does not store or log it. It then forwards the prompt to the model provider serving your chosen model, which handles it under its own data policy. The Models page shows which provider that is. QRouter does not claim end-to-end encryption to the model or trusted execution.',
   },
   {
     q: 'What does “post-quantum” cover, exactly?',
@@ -39,6 +39,6 @@ export const FAQ: AccordionItem[] = [
   },
   {
     q: 'How do I get started?',
-    a: 'Open the app, connect a Solana wallet, and either buy a prepaid key or pay per request. Developers can point the OpenAI SDK at the QSeal base URL with a prepaid key as the API key. Agents can also use the MCP endpoint.',
+    a: 'Open the app, connect a Solana wallet, and either buy a prepaid key or pay per request. Developers can point the OpenAI SDK at the QRouter base URL with a prepaid key as the API key. Agents can also use the MCP endpoint.',
   },
 ]

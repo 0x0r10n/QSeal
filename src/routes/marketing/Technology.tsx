@@ -53,7 +53,7 @@ export default function Technology() {
         <div className="mt-20">
           <Prose title="API surface" aside={<AvailabilityTag value="available" />}>
             <p>
-              QSeal speaks the OpenAI chat-completions format, so existing SDKs and agent frameworks work by changing the base URL and
+              QRouter speaks the OpenAI chat-completions format, so existing SDKs and agent frameworks work by changing the base URL and
               using a prepaid key as the API key. Responses carry one extra field, <code className="text-steel-200">qseal_receipt</code>.
             </p>
             <ul className="divide-y divide-white/[0.06] rounded-2xl border border-white/[0.07]">
@@ -90,7 +90,7 @@ export default function Technology() {
 
           <Prose title="Post-quantum primitives" aside={<AvailabilityTag value="available" />}>
             <p>
-              In 2024 NIST finalised its first post-quantum cryptography standards. QSeal uses them in two places: to seal prompts
+              In 2024 NIST finalised its first post-quantum cryptography standards. QRouter uses them in two places: to seal prompts
               between your client and the gateway, and to sign receipts so they remain verifiable after large quantum computers exist.
             </p>
             <ul className="mt-6 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.07]">

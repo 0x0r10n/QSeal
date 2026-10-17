@@ -8,16 +8,16 @@ export const SNIPPETS: Array<{ id: string; label: string; file: string; lang: La
   {
     id: 'ts',
     label: 'OpenAI SDK',
-    file: 'qseal.ts',
+    file: 'qrouter.ts',
     lang: 'ts',
     code: `import OpenAI from "openai"
 
-const qseal = new OpenAI({
-  baseURL: \`\${process.env.QSEAL_API_URL}/v1\`,
-  apiKey: process.env.QSEAL_KEY, // your prepaid key (qseal_sk_…)
+const qrouter = new OpenAI({
+  baseURL: \`\${process.env.QROUTER_API_URL || process.env.QSEAL_API_URL}/v1\`,
+  apiKey: process.env.QROUTER_KEY || process.env.QSEAL_KEY, // your prepaid key
 })
 
-const completion = await qseal.chat.completions.create({
+const completion = await qrouter.chat.completions.create({
   model: "qseal-quantum-70b",
   messages: [{ role: "user", content: "Summarise this contract." }],
 })
@@ -28,17 +28,17 @@ console.log(completion.qseal_receipt.id) // signed ML-DSA-65 + Ed25519 receipt`,
   {
     id: 'python',
     label: 'Python',
-    file: 'qseal.py',
+    file: 'qrouter.py',
     lang: 'python',
     code: `import os
 from openai import OpenAI
 
-qseal = OpenAI(
-    base_url=f"{os.environ['QSEAL_API_URL']}/v1",
-    api_key=os.environ["QSEAL_KEY"],  # your prepaid key (qseal_sk_…)
+qrouter = OpenAI(
+    base_url=f"{os.environ.get('QROUTER_API_URL', os.environ.get('QSEAL_API_URL'))}/v1",
+    api_key=os.environ.get("QROUTER_KEY", os.environ.get("QSEAL_KEY")),
 )
 
-completion = qseal.chat.completions.create(
+completion = qrouter.chat.completions.create(
     model="qseal-quantum-70b",
     messages=[{"role": "user", "content": "Summarise this contract."}],
 )
@@ -51,9 +51,9 @@ print(completion.model_extra["qseal_receipt"]["id"])  # signed receipt`,
     label: 'cURL',
     file: 'request.sh',
     lang: 'bash',
-    code: `curl "$QSEAL_API_URL/v1/chat/completions" \\
+    code: `curl "\${QROUTER_API_URL:-$QSEAL_API_URL}/v1/chat/completions" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer $QSEAL_KEY" \\
+  -H "Authorization: Bearer \${QROUTER_KEY:-$QSEAL_KEY}" \\
   -d '{
     "model": "qseal-quantum-70b",
     "messages": [
@@ -62,7 +62,7 @@ print(completion.model_extra["qseal_receipt"]["id"])  # signed receipt`,
   }'
 
 # Verify the receipt that comes back
-curl -X POST "$QSEAL_API_URL/v1/receipts/verify" \\
+curl -X POST "\${QROUTER_API_URL:-$QSEAL_API_URL}/v1/receipts/verify" \\
   -H "Content-Type: application/json" \\
   -d '{ "receipt_id": "rcpt_…" }'`,
   },

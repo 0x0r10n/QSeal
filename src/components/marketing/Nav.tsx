@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react'
 import { ArrowRight, Menu, X } from 'lucide-react'
 import { Wordmark } from '@/components/brand/QEmblem'
+import { XLogo } from '@/components/brand/XLogo'
 import { ButtonLink } from '@/components/ui/Button'
 import { EASE } from '@/lib/motion'
 import { cn } from '@/lib/cn'
@@ -43,7 +44,7 @@ export function Nav() {
         )}
       >
         <nav aria-label="Primary" className="mx-auto flex h-16 max-w-[1400px] items-center gap-6 px-5 sm:px-8 lg:px-12">
-          <Link to="/" aria-label="QSeal home" className="flex h-10 items-center rounded-md">
+          <Link to="/" aria-label="QRouter home" className="flex h-10 items-center rounded-md">
             <Wordmark />
           </Link>
 
@@ -76,7 +77,16 @@ export function Nav() {
             ))}
           </ul>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2.5">
+            <a
+              href="https://x.com/QRouter_"
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label="Follow @QRouter_ on X (formerly Twitter)"
+              className="group/x relative flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-steel-400 backdrop-blur-sm transition-all duration-300 hover:border-white/25 hover:bg-white/[0.08] hover:text-white hover:shadow-[0_0_20px_-3px_rgba(255,255,255,0.15)] active:scale-95"
+            >
+              <XLogo size={14} className="transition-transform duration-300 group-hover/x:scale-110" />
+            </a>
             <span className="hidden sm:block">
               <ButtonLink to="/app" size="sm" className="h-9 px-4">
                 Launch App <ArrowRight className="size-3.5" />
@@ -126,8 +136,17 @@ export function Nav() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: EASE, delay: 0.25 }}
-              className="mt-auto"
+              className="mt-auto flex flex-col gap-3"
             >
+              <a
+                href="https://x.com/QRouter_"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="flex h-12 w-full items-center justify-center gap-2.5 rounded-full border border-white/12 bg-white/[0.04] text-sm font-medium text-steel-100 backdrop-blur-sm transition-colors hover:border-white/20 hover:bg-white/[0.08]"
+              >
+                <XLogo size={16} />
+                <span>Follow @QRouter_ on X</span>
+              </a>
               <ButtonLink to="/app" size="lg" className="w-full">
                 Launch App <ArrowRight className="size-4" />
               </ButtonLink>
