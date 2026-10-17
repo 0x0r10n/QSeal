@@ -5,6 +5,9 @@ import { ArrowRight, Menu, X } from 'lucide-react'
 import { Wordmark } from '@/components/brand/QEmblem'
 import { XLogo } from '@/components/brand/XLogo'
 import { ButtonLink } from '@/components/ui/Button'
+import { CopyButton } from '@/components/ui/CodeBlock'
+import { shortAddress } from '@/services/wallet/wallet'
+import { env } from '@/lib/env'
 import { getAppUrl } from '@/lib/domains'
 import { EASE } from '@/lib/motion'
 import { cn } from '@/lib/cn'
@@ -44,7 +47,7 @@ export function Nav() {
             : 'border-transparent bg-transparent',
         )}
       >
-        <nav aria-label="Primary" className="mx-auto flex h-16 max-w-[1400px] items-center gap-6 px-5 sm:px-8 lg:px-12">
+        <nav aria-label="Primary" className="mx-auto flex h-16 max-w-[1400px] items-center gap-3 px-5 sm:gap-6 sm:px-8 lg:px-12">
           <Link to="/" aria-label="QRouter home" className="flex h-10 items-center rounded-md">
             <Wordmark />
           </Link>
@@ -77,6 +80,17 @@ export function Nav() {
               </li>
             ))}
           </ul>
+
+          {env.ca && (
+            // Hidden on tablets (md–lg), where the page links leave no room for it.
+            <div className="flex min-w-0 flex-1 justify-center md:hidden lg:flex">
+              <CopyButton value={env.ca} label="Copy contract address" className="max-w-full whitespace-nowrap font-mono max-sm:px-2.5 max-sm:text-[11px] max-[374px]:[&>span:first-child]:hidden">
+                <span className="mr-1.5 text-steel-500">CA</span>
+                <span className="hidden xl:inline">{env.ca}</span>
+                <span className="xl:hidden">{shortAddress(env.ca)}</span>
+              </CopyButton>
+            </div>
+          )}
 
           <div className="ml-auto flex items-center gap-2.5">
             <a

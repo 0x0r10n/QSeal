@@ -25,6 +25,8 @@ export const env = {
   /** Sample data is only ever possible in dev builds. */
   devMocks: import.meta.env.DEV && (import.meta.env.VITE_QROUTER_DEV_MOCKS === 'true' || import.meta.env.VITE_QSEAL_DEV_MOCKS === 'true'),
   isDev: import.meta.env.DEV,
+  /** Token contract address shown in the site header. Hidden while unset. */
+  ca: import.meta.env.VITE_QROUTER_CA?.trim() || null,
 } as const
 
 export type BackendMode = 'live' | 'mock' | 'unconfigured'

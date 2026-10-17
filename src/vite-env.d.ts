@@ -4,6 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_QROUTER_API_URL?: string
   readonly VITE_QROUTER_API_TIMEOUT_MS?: string
   readonly VITE_QROUTER_DEV_MOCKS?: string
+  readonly VITE_QROUTER_CA?: string
   readonly VITE_QSEAL_API_URL?: string
   readonly VITE_QSEAL_API_TIMEOUT_MS?: string
   readonly VITE_QSEAL_DEV_MOCKS?: string

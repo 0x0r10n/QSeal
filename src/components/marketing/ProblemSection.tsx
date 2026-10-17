@@ -58,8 +58,8 @@ export function ProblemSection() {
   const ref = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start 80%', 'end 40%'] })
-  // Quantised to whole characters so scrolling re-renders only when the text changes.
-  const steps = PLAIN.length
+  // Quantised to 3-character steps: each step re-renders and reflows, so per-character updates made scrolling janky.
+  const steps = Math.ceil(PLAIN.length / 3)
   const [step, setStep] = useState(reduced ? steps : 0)
   useMotionValueEvent(scrollYProgress, 'change', (v) => {
     if (reduced) return

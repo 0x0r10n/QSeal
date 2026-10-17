@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentProps, type ComponentType } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
 import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import { ButtonLink } from '@/components/ui/Button'
@@ -9,7 +9,9 @@ import { useReducedMotion, useMediaQuery } from '@/hooks/useMediaQuery'
 import { hasWebGL } from '@/lib/webgl'
 import { DURATION, EASE } from '@/lib/motion'
 
-const HeroScene = lazy(() => import('./HeroScene'))
+// If the 3D chunk fails to load (stale deploy, flaky network), keep the static emblem instead of crashing the page.
+type Scene = ComponentType<ComponentProps<typeof import('./HeroScene').default>>
+const HeroScene = lazy<Scene>(() => import('./HeroScene').catch(() => ({ default: () => null })))
 
 const HEADLINE = ['Intelligence', 'deserves', 'privacy.']
 

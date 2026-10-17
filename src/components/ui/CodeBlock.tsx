@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { highlight, type Lang, type Token } from '@/lib/highlight'
@@ -16,7 +16,7 @@ const colors: Record<Token['kind'], string> = {
   flag: 'text-[#d8c7a6]',
 }
 
-export function CopyButton({ value, className, label = 'Copy code' }: { value: string; className?: string; label?: string }) {
+export function CopyButton({ value, className, label = 'Copy code', children }: { value: string; className?: string; label?: string; children?: ReactNode }) {
   const [copied, setCopied] = useState(false)
   async function copy() {
     try {
@@ -49,7 +49,7 @@ export function CopyButton({ value, className, label = 'Copy code' }: { value: s
           {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
         </motion.span>
       </AnimatePresence>
-      <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
+      <span aria-live="polite" className="min-w-0 truncate">{copied ? 'Copied' : children ?? 'Copy'}</span>
     </button>
   )
 }

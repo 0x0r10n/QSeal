@@ -201,9 +201,9 @@ export default function HeroScene({ progress, active, onReady, compact }: SceneP
   return (
     <Canvas
       frameloop={active ? 'always' : 'never'}
-      dpr={compact ? [1, 1.5] : [1, 1.75]}
+      dpr={compact ? [1, 1.25] : [1, 1.5]}
       camera={{ position: [0, 0, 6.4], fov: 30 }}
-      gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+      gl={{ antialias: !compact, alpha: true, powerPreference: 'high-performance' }}
       aria-hidden
     >
       <ambientLight intensity={0.12} />

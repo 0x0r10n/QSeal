@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpRight } from 'lucide-react'
 import { Wordmark } from '@/components/brand/QEmblem'
 import { XLogo } from '@/components/brand/XLogo'
 import { getAppUrl } from '@/lib/domains'
 
-const COLS: Array<{ title: string; links: Array<{ label: string; to: string; external?: boolean; isApp?: boolean }> }> = [
+const COLS: Array<{ title: string; links: Array<{ label: string; to: string; isApp?: boolean }> }> = [
   {
     title: 'Product',
     links: [
@@ -22,21 +21,12 @@ const COLS: Array<{ title: string; links: Array<{ label: string; to: string; ext
       { label: 'Documentation', to: '/docs' },
     ],
   },
-  {
-    title: 'Standards',
-    links: [
-      { label: 'NIST Post-Quantum Cryptography', to: 'https://csrc.nist.gov/projects/post-quantum-cryptography', external: true },
-      { label: 'FIPS 203 · ML-KEM', to: 'https://csrc.nist.gov/pubs/fips/203/final', external: true },
-      { label: 'FIPS 204 · ML-DSA', to: 'https://csrc.nist.gov/pubs/fips/204/final', external: true },
-      { label: 'Solana documentation', to: 'https://solana.com/docs', external: true },
-    ],
-  },
 ]
 
 export function Footer() {
   return (
     <footer className="relative border-t border-white/[0.06] bg-ink-1000">
-      <div className="mx-auto grid max-w-[1400px] gap-14 px-5 py-16 sm:px-8 md:grid-cols-[1.3fr_repeat(3,1fr)] lg:px-12">
+      <div className="mx-auto grid max-w-[1400px] gap-14 px-5 py-16 sm:px-8 md:grid-cols-[1.3fr_repeat(2,1fr)] lg:px-12">
         <div>
           <Wordmark />
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-steel-500">
@@ -60,19 +50,16 @@ export function Footer() {
             <ul className="mt-5 space-y-3">
               {col.links.map((l) => {
                 const targetUrl = l.isApp ? getAppUrl(l.to) : l.to
-                const isExternal = l.external || /^https?:\/\//i.test(targetUrl)
+                const isExternal = /^https?:\/\//i.test(targetUrl)
 
                 return (
                   <li key={l.label}>
                     {isExternal ? (
                       <a
                         href={targetUrl}
-                        target={l.external ? '_blank' : undefined}
-                        rel={l.external ? 'noreferrer noopener' : undefined}
-                        className="group inline-flex items-center gap-1 text-sm text-steel-400 transition-colors hover:text-steel-50"
+                        className="text-sm text-steel-400 transition-colors hover:text-steel-50"
                       >
                         {l.label}
-                        {l.external && <ArrowUpRight className="size-3 opacity-50 transition group-hover:opacity-100" />}
                       </a>
                     ) : (
                       <Link to={targetUrl} className="text-sm text-steel-400 transition-colors hover:text-steel-50">

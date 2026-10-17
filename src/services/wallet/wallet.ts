@@ -5,12 +5,14 @@
  */
 import { getWallets } from '@wallet-standard/app'
 import type { Wallet, WalletAccount } from '@wallet-standard/base'
-import { Transaction, VersionedTransaction } from '@solana/web3.js'
 import { useSyncExternalStore } from 'react'
 import { local, readJSON, remove, writeJSON } from '@/lib/storage'
 import { base64ToBytes, fromBase58, toBase58 } from '../crypto/bytes'
 
-function parseTransactionObject(bytes: Uint8Array): Transaction | VersionedTransaction {
+// Only the injected-provider fallbacks need a Transaction object, so the Solana SDK loads on demand
+// instead of shipping in the landing page bundle.
+async function parseTransactionObject(bytes: Uint8Array) {
+  const { Transaction, VersionedTransaction } = await import('@solana/web3.js')
   try {
     return Transaction.from(bytes)
   } catch {
@@ -26,6 +28,8 @@ const LAST = 'qrouter.wallet.last'
 const LEGACY_LAST = 'qseal.wallet.last'
 
 type Features = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
+/** What wallets throw: an Error or an EIP-1193-style `{ code, message }`. */
+type WalletError = { message?: string; code?: number } | null | undefined
 
 export interface WalletState {
   available: Wallet[]
@@ -109,7 +113,7 @@ function getInjectedSolanaWallets(): Wallet[] {
         },
         [SIGN_AND_SEND]: {
           signAndSendTransaction: async ({ transaction }: { transaction: Uint8Array }) => {
-            const txObj = parseTransactionObject(transaction)
+            const txObj = await parseTransactionObject(transaction)
             const signed = await phantom.signAndSendTransaction(txObj)
             const sig = signed?.signature || signed
             return [{ signature: typeof sig === 'string' ? sig : toBase58(sig as Uint8Array) }]
@@ -151,7 +155,7 @@ function getInjectedSolanaWallets(): Wallet[] {
         },
         [SIGN_AND_SEND]: {
           signAndSendTransaction: async ({ transaction }: { transaction: Uint8Array }) => {
-            const txObj = parseTransactionObject(transaction)
+            const txObj = await parseTransactionObject(transaction)
             const signed = await solflare.signAndSendTransaction(txObj)
             const sig = signed?.signature || signed
             return [{ signature: typeof sig === 'string' ? sig : toBase58(sig as Uint8Array) }]
@@ -220,7 +224,7 @@ export function useWallet(): WalletState {
   )
 }
 
-function cleanWalletError(err: any, walletName: string = 'Phantom'): string {
+function cleanWalletError(err: WalletError, walletName: string = 'Phantom'): string {
   const msg = String(err?.message || err || '')
   const code = err?.code
 
@@ -324,7 +328,8 @@ export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } =
         const connectInput = opts.silent ? { silent: true } : {}
         const { accounts } = await features[CONNECT].connect(connectInput)
         account = (accounts as WalletAccount[])?.find((a) => a.chains?.some((c) => c.startsWith('solana:'))) ?? accounts?.[0] ?? null
-      } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      } catch (e) {
+        const err = e as WalletError
         if (opts.silent) return
         throw new Error(cleanWalletError(err, wallet.name))
       }
@@ -446,7 +451,8 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
       if (out?.signature) {
         return typeof out.signature === 'string' ? out.signature : toBase58(out.signature as Uint8Array)
       }
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as WalletError
       const msg = String(err?.message || err)
       if (msg.includes('User rejected') || msg.includes('User cancelled') || msg.includes('Transaction cancelled')) {
         throw new Error('Transaction cancelled in wallet')
@@ -463,11 +469,12 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
     const phantom = getPhantomProvider()
     if (phantom?.signAndSendTransaction) {
       try {
-        const txObj = parseTransactionObject(bytes)
+        const txObj = await parseTransactionObject(bytes)
         const signed = await phantom.signAndSendTransaction(txObj)
         const sig = signed?.signature || signed
         return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
-      } catch (err: any) {
+      } catch (e) {
+        const err = e as WalletError
         const msg = String(err?.message || err)
         if (msg.includes('User rejected') || msg.includes('User cancelled') || msg.includes('Transaction cancelled')) {
           throw new Error('Transaction cancelled in wallet')
@@ -485,11 +492,12 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
     const solflare = getSolflareProvider()
     if (solflare?.signAndSendTransaction) {
       try {
-        const txObj = parseTransactionObject(bytes)
+        const txObj = await parseTransactionObject(bytes)
         const signed = await solflare.signAndSendTransaction(txObj)
         const sig = signed?.signature || signed
         return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
-      } catch (err: any) {
+      } catch (e) {
+        const err = e as WalletError
         const msg = String(err?.message || err)
         if (msg.includes('User rejected') || msg.includes('User cancelled') || msg.includes('Transaction cancelled')) {
           throw new Error('Transaction cancelled in wallet')
