@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MotionConfig } from 'motion/react'
+import { Analytics } from '@vercel/analytics/react'
 import { usePrefs } from '@/hooks/usePrefs'
 import { ApiError } from '@/services/api/errors'
 
@@ -23,7 +24,10 @@ function Motion({ children }: { children: ReactNode }) {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <Motion>{children}</Motion>
+      <Motion>
+        {children}
+        <Analytics />
+      </Motion>
     </QueryClientProvider>
   )
 }
