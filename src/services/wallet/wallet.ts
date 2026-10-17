@@ -5,9 +5,18 @@
  */
 import { getWallets } from '@wallet-standard/app'
 import type { Wallet, WalletAccount } from '@wallet-standard/base'
+import { Transaction, VersionedTransaction } from '@solana/web3.js'
 import { useSyncExternalStore } from 'react'
 import { local, readJSON, remove, writeJSON } from '@/lib/storage'
 import { base64ToBytes, fromBase58, toBase58 } from '../crypto/bytes'
+
+function parseTransactionObject(bytes: Uint8Array): Transaction | VersionedTransaction {
+  try {
+    return VersionedTransaction.deserialize(bytes)
+  } catch {
+    return Transaction.from(bytes)
+  }
+}
 
 const CONNECT = 'standard:connect'
 const DISCONNECT = 'standard:disconnect'
@@ -99,8 +108,10 @@ function getInjectedSolanaWallets(): Wallet[] {
         },
         [SIGN_AND_SEND]: {
           signAndSendTransaction: async ({ transaction }: { transaction: Uint8Array }) => {
-            const signed = await phantom.signAndSendTransaction(transaction)
-            return [{ signature: signed.signature }]
+            const txObj = parseTransactionObject(transaction)
+            const signed = await phantom.signAndSendTransaction(txObj)
+            const sig = signed?.signature || signed
+            return [{ signature: typeof sig === 'string' ? sig : toBase58(sig as Uint8Array) }]
           },
         },
       },
@@ -139,8 +150,10 @@ function getInjectedSolanaWallets(): Wallet[] {
         },
         [SIGN_AND_SEND]: {
           signAndSendTransaction: async ({ transaction }: { transaction: Uint8Array }) => {
-            const signed = await solflare.signAndSendTransaction(transaction)
-            return [{ signature: signed.signature }]
+            const txObj = parseTransactionObject(transaction)
+            const signed = await solflare.signAndSendTransaction(txObj)
+            const sig = signed?.signature || signed
+            return [{ signature: typeof sig === 'string' ? sig : toBase58(sig as Uint8Array) }]
           },
         },
       },
@@ -353,25 +366,28 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
   const { wallet, account } = state
   if (!wallet || !account) throw new Error('Connect a wallet first')
 
+  const bytes = base64ToBytes(transactionBase64)
+  const targetChain = ((account.chains as readonly string[] | undefined)?.includes(chain) ? chain : account.chains?.[0] || chain) as `${string}:${string}`
+
   // 1. Wallet Standard signAndSendTransaction
   const features = wallet.features as Features
   if (features?.[SIGN_AND_SEND]?.signAndSendTransaction) {
     try {
       const [out] = await features[SIGN_AND_SEND].signAndSendTransaction({
         account,
-        chain,
-        transaction: base64ToBytes(transactionBase64),
+        chain: targetChain,
+        transaction: bytes,
       })
       if (out?.signature) {
         return typeof out.signature === 'string' ? out.signature : toBase58(out.signature as Uint8Array)
       }
     } catch (err: any) {
       const msg = String(err?.message || err)
-      if (msg.includes('User rejected') || msg.includes('User cancelled')) {
-        throw err
+      if (msg.includes('User rejected') || msg.includes('User cancelled') || msg.includes('Transaction cancelled')) {
+        throw new Error('Transaction cancelled in wallet')
       }
       console.warn('Wallet standard signAndSendTransaction failed, checking injected fallback:', err)
-      if (!wallet.name.toLowerCase().includes('phantom')) {
+      if (!wallet.name.toLowerCase().includes('phantom') && !wallet.name.toLowerCase().includes('solflare')) {
         throw err
       }
     }
@@ -381,10 +397,21 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
   if (wallet.name.toLowerCase().includes('phantom')) {
     const phantom = getPhantomProvider()
     if (phantom?.signAndSendTransaction) {
-      const signed = await phantom.signAndSendTransaction(base64ToBytes(transactionBase64))
-      return signed.signature
-        ? (typeof signed.signature === 'string' ? signed.signature : toBase58(signed.signature))
-        : toBase58(signed as any)
+      const txObj = parseTransactionObject(bytes)
+      const signed = await phantom.signAndSendTransaction(txObj)
+      const sig = signed?.signature || signed
+      return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
+    }
+  }
+
+  // 3. Injected Solflare fallback
+  if (wallet.name.toLowerCase().includes('solflare')) {
+    const solflare = getSolflareProvider()
+    if (solflare?.signAndSendTransaction) {
+      const txObj = parseTransactionObject(bytes)
+      const signed = await solflare.signAndSendTransaction(txObj)
+      const sig = signed?.signature || signed
+      return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
     }
   }
 
