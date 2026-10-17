@@ -35,16 +35,33 @@ In the app, open **Prepaid Keys → Create a test key**, then **New Request**. A
 
 ## Deploy
 
-One image runs the gateway and serves the web app from the same origin:
+### Web app on Vercel
+
+The repo is ready to import into Vercel as-is (`vercel.json` sets the build, SPA routing, asset caching and security headers; `.vercelignore` leaves the gateway out of the upload).
+
+1. **Import** the repository in Vercel. Framework, build command and output directory are picked up from `vercel.json`. Keep the root directory as the repository root.
+2. **Environment variable** (Project → Settings → Environment Variables), for Production and Preview:
+
+   | Name | Value |
+   | --- | --- |
+   | `VITE_QSEAL_API_URL` | Your gateway's public URL, e.g. `https://api.yourdomain.com` |
+
+   It is read at build time, so redeploy after changing it. Without it, the site deploys in a clearly labelled "not connected" mode.
+3. **Domain**: add your domain under Project → Domains.
+4. **On the gateway**, allow the site's origin: `CORS_ORIGINS=https://yourdomain.com,https://your-project.vercel.app`.
+
+### Gateway (not on Vercel)
+
+The gateway needs a persistent disk for its database (prepaid balances, spent payments, receipts) and signing keys. Vercel functions have none, so balances would be lost and replay protection would reset. Run it from the `Dockerfile` on a host with a volume, such as Railway, Render, Fly.io or a VPS:
 
 ```bash
 docker build -t qseal .
 docker run -p 8080:8080 -v qseal-data:/data --env-file backend/.env qseal
 ```
 
-`/data` holds the SQLite database (balances, receipts, spent payments) and the signing keys. **It must be persistent.** On hosts without a persistent disk, put the keys in `QSEAL_KEYS_JSON` and use a mounted volume for the database.
+Mount `/data` on a persistent volume. On hosts without a persistent disk, put the keys in `QSEAL_KEYS_JSON` and use a mounted volume for the database. Put the gateway behind HTTPS (most hosts do this) and set `TRUST_PROXY=true`.
 
-To host the web app separately (static hosting or a CDN), build it with `VITE_QSEAL_API_URL=https://your-gateway` and set `CORS_ORIGINS` on the gateway to the app's origin.
+The same image also serves the web app, so you can skip Vercel entirely and run everything from one origin.
 
 ## Launch checklist
 
@@ -57,6 +74,7 @@ The gateway refuses to start with `NODE_ENV=production` unless the first four ar
 - [ ] `SOLANA_NETWORK=mainnet-beta` when you are ready for real USDC.
 - [ ] A persistent volume for `/data`, and a backup of `qseal_keys.json`. Losing or rotating the signing keys invalidates every receipt issued before.
 - [ ] HTTPS in front of the gateway, and `TRUST_PROXY=true` behind a load balancer so rate limits see real client IPs.
+- [ ] Vercel: `VITE_QSEAL_API_URL` set, and the site's origins listed in the gateway's `CORS_ORIGINS`.
 - [ ] `PRICE_PER_REQUEST_USDC` and `MIN_PREPAID_DEPOSIT_USDC` set to your pricing.
 - [ ] Privacy policy and terms of service published, and linked from the site footer.
 - [ ] A security contact for vulnerability reports.

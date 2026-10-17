@@ -1,0 +1,11 @@
+# The gateway is deployed separately (it needs a persistent disk).
+backend
+e2e
+scripts
+screenshots
+test-results
+playwright-report
+dist-live
+preview-dist
+Dockerfile
+.dockerignore
