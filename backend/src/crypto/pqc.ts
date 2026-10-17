@@ -78,8 +78,8 @@ class PQCManager {
     generatedAt: string;
   } | null {
     try {
-      // QSEAL_KEYS_JSON (raw JSON or base64) lets hosts without a persistent disk keep stable keys.
-      const fromEnv = process.env.QSEAL_KEYS_JSON?.trim();
+      // QROUTER_KEYS_JSON (raw JSON or base64) lets hosts without a persistent disk keep stable keys.
+      const fromEnv = (process.env.QROUTER_KEYS_JSON || process.env.QSEAL_KEYS_JSON)?.trim();
       const raw = fromEnv
         ? (fromEnv.startsWith('{') ? fromEnv : Buffer.from(fromEnv, 'base64').toString('utf8'))
         : fs.existsSync(config.keysFilePath) ? fs.readFileSync(config.keysFilePath, 'utf8') : null;

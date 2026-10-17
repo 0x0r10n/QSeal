@@ -14,7 +14,7 @@ export const SNIPPETS: Array<{ id: string; label: string; file: string; lang: La
 
 const qrouter = new OpenAI({
   baseURL: \`\${process.env.QROUTER_API_URL || 'https://api.qrouter.cloud'}/v1\`,
-  apiKey: process.env.QROUTER_KEY || process.env.QSEAL_KEY, // your prepaid key
+  apiKey: process.env.QROUTER_KEY, // your prepaid key
 })
 
 const completion = await qrouter.chat.completions.create({
@@ -23,7 +23,7 @@ const completion = await qrouter.chat.completions.create({
 })
 
 console.log(completion.choices[0].message.content)
-console.log(completion.qrouter_receipt?.id || (completion as any).qseal_receipt?.id) // signed ML-DSA-65 + Ed25519 receipt`,
+console.log(completion.qrouter_receipt?.id) // signed ML-DSA-65 + Ed25519 receipt`,
   },
   {
     id: 'python',
@@ -35,7 +35,7 @@ from openai import OpenAI
 
 qrouter = OpenAI(
     base_url=f"{os.environ.get('QROUTER_API_URL', 'https://api.qrouter.cloud')}/v1",
-    api_key=os.environ.get("QROUTER_KEY", os.environ.get("QSEAL_KEY")),
+    api_key=os.environ.get("QROUTER_KEY"),
 )
 
 completion = qrouter.chat.completions.create(
@@ -44,7 +44,7 @@ completion = qrouter.chat.completions.create(
 )
 
 print(completion.choices[0].message.content)
-print(completion.model_extra.get("qrouter_receipt", completion.model_extra.get("qseal_receipt", {}))["id"])  # signed receipt`,
+print(completion.model_extra.get("qrouter_receipt", {})["id"])  # signed receipt`,
   },
   {
     id: 'curl',
@@ -53,7 +53,7 @@ print(completion.model_extra.get("qrouter_receipt", completion.model_extra.get("
     lang: 'bash',
     code: `curl "\${QROUTER_API_URL:-https://api.qrouter.cloud}/v1/chat/completions" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer \${QROUTER_KEY:-$QSEAL_KEY}" \\
+  -H "Authorization: Bearer \${QROUTER_KEY}" \\
   -d '{
     "model": "qrouter-quantum-70b",
     "messages": [
