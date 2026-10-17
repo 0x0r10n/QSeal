@@ -12,9 +12,9 @@ import { base64ToBytes, fromBase58, toBase58 } from '../crypto/bytes'
 
 function parseTransactionObject(bytes: Uint8Array): Transaction | VersionedTransaction {
   try {
-    return VersionedTransaction.deserialize(bytes)
-  } catch {
     return Transaction.from(bytes)
+  } catch {
+    return VersionedTransaction.deserialize(bytes)
   }
 }
 
@@ -398,10 +398,21 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
   if (wallet.name.toLowerCase().includes('phantom')) {
     const phantom = getPhantomProvider()
     if (phantom?.signAndSendTransaction) {
-      const txObj = parseTransactionObject(bytes)
-      const signed = await phantom.signAndSendTransaction(txObj)
-      const sig = signed?.signature || signed
-      return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
+      try {
+        const txObj = parseTransactionObject(bytes)
+        const signed = await phantom.signAndSendTransaction(txObj)
+        const sig = signed?.signature || signed
+        return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
+      } catch (err: any) {
+        const msg = String(err?.message || err)
+        if (msg.includes('User rejected') || msg.includes('User cancelled') || msg.includes('Transaction cancelled')) {
+          throw new Error('Transaction cancelled in wallet')
+        }
+        if (msg.includes('disconnected port') || msg.includes('Attempting to use a disconnected port')) {
+          throw new Error('Phantom extension connection lost. Please unlock or reload Phantom and try again.')
+        }
+        throw err
+      }
     }
   }
 
@@ -409,10 +420,18 @@ export async function signAndSend(transactionBase64: string, chain: string): Pro
   if (wallet.name.toLowerCase().includes('solflare')) {
     const solflare = getSolflareProvider()
     if (solflare?.signAndSendTransaction) {
-      const txObj = parseTransactionObject(bytes)
-      const signed = await solflare.signAndSendTransaction(txObj)
-      const sig = signed?.signature || signed
-      return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
+      try {
+        const txObj = parseTransactionObject(bytes)
+        const signed = await solflare.signAndSendTransaction(txObj)
+        const sig = signed?.signature || signed
+        return typeof sig === 'string' ? sig : toBase58(sig as Uint8Array)
+      } catch (err: any) {
+        const msg = String(err?.message || err)
+        if (msg.includes('User rejected') || msg.includes('User cancelled') || msg.includes('Transaction cancelled')) {
+          throw new Error('Transaction cancelled in wallet')
+        }
+        throw err
+      }
     }
   }
 
