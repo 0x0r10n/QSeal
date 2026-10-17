@@ -1,4 +1,14 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+// Builds without VITE_QROUTER_API_URL fall back to the production gateway (src/lib/env.ts).
+// Keep these journeys off it: every gateway call fails as if it were unreachable.
+test.beforeEach(async ({ context }) => {
+  await context.route(/^https:\/\/api\.qrouter\.cloud\//, (r) => r.abort())
+})
+
+// The app is behind sign-in (AuthGuard). A well-formed key is enough to enter it.
+const signIn = (page: Page) =>
+  page.addInitScript(() => sessionStorage.setItem('qrouter.accessKey', JSON.stringify('qrouter_sk_' + '0'.repeat(48))))
 
 test.describe('public site', () => {
   test('landing page is a marketing page, not the dashboard', async ({ page }) => {
@@ -31,13 +41,16 @@ test.describe('public site', () => {
     await expect(page).toHaveURL(/\/technology$/)
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Infrastructure for inference')
 
+    // Signed-out visitors are sent to sign-in.
     await page.getByRole('link', { name: /Launch App/ }).first().click()
-    await expect(page).toHaveURL(/\/app$/)
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page).toHaveURL(/\/sign-in$/)
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Sign in to QRouter')
   })
 })
 
 test.describe('application', () => {
+  test.beforeEach(({ page }) => signIn(page))
+
   test('moves between app pages', async ({ page, isMobile }) => {
     await page.goto('/app')
     const routes: Array<[string, RegExp]> = [
@@ -56,12 +69,13 @@ test.describe('application', () => {
     }
   })
 
-  test('new request handles a missing backend gracefully', async ({ page }) => {
+  test('new request handles an unreachable gateway gracefully', async ({ page }) => {
     await page.goto('/app/new')
-    await expect(page.getByText('No backend connected.')).toBeVisible()
     await page.locator('#prompt').fill('Hello')
-    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeDisabled()
-    await expect(page.getByText('Sending is disabled because no backend is configured')).toBeVisible()
+    // No model catalogue, so nothing can be sent, and the key's balance is shown as unknown rather than zero.
+    await expect(page.getByRole('combobox', { name: 'Model' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Seal & send' })).toBeDisabled()
+    await expect(page.getByText('Balance unavailable')).toBeVisible()
   })
 
   test('verify never reports valid without a gateway', async ({ page }) => {

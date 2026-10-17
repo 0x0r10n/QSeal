@@ -6,10 +6,15 @@ import { expect, test, type Page } from '@playwright/test'
  * answers with its labelled dev engine).
  */
 
+// The app is behind sign-in, so get a dev key from the gateway and sign in with it the way a user would.
 async function createTestKey(page: Page) {
+  const res = await page.request.post('http://localhost:4021/v1/keys/prepaid', { data: { dev: true, amount_usdc: 5 } })
+  const { api_key } = await res.json()
+  await page.goto('/sign-in')
+  await page.locator('#key').fill(api_key)
+  await page.getByRole('button', { name: 'Continue with key' }).click()
+  await expect(page).toHaveURL(/\/app/)
   await page.goto('/app/keys')
-  await page.getByRole('button', { name: 'Create a test key' }).click()
-  await expect(page.getByText('Your key')).toBeVisible()
 }
 
 const verdict = (page: Page) => page.locator('[role=status][aria-live=polite] p.text-lg').first()
@@ -41,7 +46,7 @@ test('verify: genuine, tampered, foreign-key, by ID, and junk receipts', async (
   await page.locator('#prompt').fill('Receipt please')
   await page.getByRole('button', { name: 'Seal & send' }).click()
   await expect(page.getByText('Signature verified')).toBeVisible({ timeout: 20_000 })
-  const receipt = await page.evaluate(() => JSON.parse(localStorage.getItem('qseal.history.v1')!)[0].receipt)
+  const receipt = await page.evaluate(() => JSON.parse(localStorage.getItem('qrouter.history.v1')!)[0].receipt)
 
   await page.goto('/app/verify')
   const check = async (input: string, expected: string) => {
@@ -60,6 +65,7 @@ test('verify: genuine, tampered, foreign-key, by ID, and junk receipts', async (
 })
 
 test('shows real catalogue data and the development-mode warning', async ({ page }) => {
+  await createTestKey(page)
   await page.goto('/app/models')
   await expect(page.getByText('qrouter-quantum-70b')).toBeVisible()
   await expect(page.getByText('0.001 USDC').first()).toBeVisible()
@@ -105,17 +111,23 @@ test('wallet: connect, pay per request, and keep an unused payment for retry', a
     if (r.url().endsWith('/v1/chat/completions') && r.method() === 'POST') paymentHeader = r.headers()['payment-signature']
   })
 
-  await page.goto('/app/new')
-  await page.locator('header').getByRole('button', { name: /Connect wallet/ }).click()
+  // Sign in with the wallet (sign-in redirects into the app once connected), then open New Request.
+  await page.goto('/sign-in')
+  await page.getByRole('button', { name: /Connect wallet/ }).click()
   await page.getByRole('menuitem', { name: 'Test Wallet' }).click()
+  await expect(page).toHaveURL(/\/app/)
+  await page.getByRole('link', { name: 'New Request' }).first().click()
   await expect(page.locator('header').getByRole('button', { name: /Vote…1111/ })).toBeVisible()
-  await expect(page.locator('input[name=pay]').nth(1)).toBeChecked()
+  // A newly connected wallet starts on its free trial; choose pay-per-request to exercise x402.
+  await expect(page.getByRole('radio', { name: /Free Trial/ })).toBeChecked()
+  await page.getByRole('radio', { name: /Wallet, pay per request/ }).check()
 
   await page.locator('#prompt').fill('Pay per request')
   await page.getByRole('button', { name: 'Seal & send' }).click()
 
   // The gateway received the wallet's signature as an x402 payment (and could not confirm it here).
-  await expect(page.getByRole('alert')).toContainText('Payment required')
+  // The gateway polls for on-chain confirmation for up to 20 s (CONFIRM_WAIT_MS) before refusing.
+  await expect(page.getByRole('alert')).toContainText('Payment required', { timeout: 30_000 })
   expect(JSON.parse(Buffer.from(paymentHeader!, 'base64').toString())).toMatchObject({
     x402Version: 2,
     reference: 'Ref1111111111111111111111111111111111111111',
