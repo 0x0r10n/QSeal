@@ -36,8 +36,10 @@ export function Nav() {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
+      {/* Slide in only on the landing page: every other page (e.g. sign-in after Launch App) mounts a fresh
+          header, and replaying the entrance there reads as a flicker. */}
       <motion.div
-        initial={{ y: -24, opacity: 0 }}
+        initial={location.pathname === '/' ? { y: -24, opacity: 0 } : false}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 1, ease: EASE, delay: 0.05 }}
         className={cn(

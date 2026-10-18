@@ -51,8 +51,8 @@ export default function SignIn() {
       <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,#1a1a1f,#060607_70%)]" />
       <div aria-hidden className="pinstripes mask-radial absolute inset-0 -z-10" />
       <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.7, ease: EASE }}
         className="surface-raised w-full max-w-[370px] rounded-[20px] p-5"
       >
