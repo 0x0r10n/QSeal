@@ -208,9 +208,12 @@ function start() {
   // Quietly restore the last wallet the user connected.
   const last = readJSON<string | null>(local, LAST, null) ?? readJSON<string | null>(local, LEGACY_LAST, null)
   if (last) {
+    let restoring = false
     const tryRestore = () => {
       const w = state.available.find((x) => x.name.toLowerCase() === last.toLowerCase())
-      if (w && !state.wallet) void connectWallet(w, { silent: true }).catch(() => {})
+      if (!w || state.wallet || restoring) return
+      restoring = true
+      void connectWallet(w, { silent: true }).catch(() => {})
     }
     tryRestore()
     api.on('register', tryRestore)
@@ -231,17 +234,17 @@ export function useWallet(): WalletState {
   )
 }
 
+/** The user said no (4001, https://docs.phantom.com/solana/errors), as opposed to the wallet failing. */
+function isRejection(err: WalletError): boolean {
+  const msg = String(err?.message || err || '').toLowerCase()
+  return err?.code === 4001 || msg.includes('rejected') || msg.includes('cancelled') || msg.includes('declined')
+}
+
 function cleanWalletError(err: WalletError, walletName: string = 'Phantom'): string {
   const msg = String(err?.message || err || '')
   const code = err?.code
 
-  if (
-    code === 4001 ||
-    msg.toLowerCase().includes('user rejected') ||
-    msg.toLowerCase().includes('rejected') ||
-    msg.toLowerCase().includes('cancelled') ||
-    msg.toLowerCase().includes('declined')
-  ) {
+  if (isRejection(err)) {
     return `Connection request was cancelled in ${walletName}.`
   }
   if (code === -32002 || msg.toLowerCase().includes('already pending')) {
@@ -264,11 +267,27 @@ function cleanWalletError(err: WalletError, walletName: string = 'Phantom'): str
 const CONNECT_TIMEOUT_MS = 60_000
 const SILENT_TIMEOUT_MS = 10_000
 
+// The connect in progress. Wallets allow one request at a time (Phantom: -32002, "only one approve window can
+// be open at a time"), so a click during the silent restore waits for it instead of sending a second request.
+let inflight: Promise<void> | null = null
+
+export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } = {}) {
+  while (inflight) await inflight.catch(() => {})
+  if (state.account && state.wallet?.name === wallet.name) return
+  const run = connectWithTimeout(wallet, opts)
+  inflight = run
+  try {
+    await run
+  } finally {
+    if (inflight === run) inflight = null
+  }
+}
+
 /**
  * Connect, but never wait forever: a wallet whose popup was closed without an answer can leave
  * the promise pending, which would keep the UI (and AuthGuard) on "Connecting…".
  */
-export async function connectWallet(wallet: Wallet, opts: { silent?: boolean } = {}) {
+async function connectWithTimeout(wallet: Wallet, opts: { silent?: boolean }) {
   let timer: ReturnType<typeof setTimeout> | undefined
   const attempt = connectOnce(wallet, opts)
   const timedOut = new Promise<'timeout'>((r) => {
@@ -297,8 +316,24 @@ async function connectOnce(wallet: Wallet, opts: { silent?: boolean }) {
     let account: WalletAccount | null = null
     const features = (wallet.features || {}) as Features
 
-    // 1. For Phantom, prefer native window.phantom.solana directly for maximum reliability
-    if (isPhantom) {
+    // 1. Wallet Standard connect, the path every wallet here registers. Phantom's silent restore is the exception:
+    //    it uses Phantom's documented onlyIfTrusted below, so loading a page can never open a popup.
+    if (features[CONNECT]?.connect && !(isPhantom && opts.silent)) {
+      try {
+        const connectInput = opts.silent ? { silent: true } : {}
+        const { accounts } = await features[CONNECT].connect(connectInput)
+        account = (accounts as WalletAccount[])?.find((a) => a.chains?.some((c) => c.startsWith('solana:'))) ?? accounts?.[0] ?? null
+      } catch (e) {
+        const err = e as WalletError
+        if (opts.silent) return
+        console.warn(`[wallet] ${wallet.name} Wallet Standard connect failed`, err?.code, err?.message)
+        // Phantom and Solflare also inject their own provider; try it before giving up, unless the user said no.
+        if (!(isPhantom || isSolflare) || isRejection(err)) throw new Error(cleanWalletError(err, wallet.name))
+      }
+    }
+
+    // 2. Phantom's injected provider (window.phantom.solana)
+    if (!account && isPhantom) {
       const phantom = getPhantomProvider()
       if (phantom) {
         // If already connected and authorized, use existing pubkey immediately
@@ -353,19 +388,6 @@ async function connectOnce(wallet: Wallet, opts: { silent?: boolean }) {
             }
           }
         }
-      }
-    }
-
-    // 2. Try standard connect feature if account not resolved yet
-    if (!account && features[CONNECT]?.connect) {
-      try {
-        const connectInput = opts.silent ? { silent: true } : {}
-        const { accounts } = await features[CONNECT].connect(connectInput)
-        account = (accounts as WalletAccount[])?.find((a) => a.chains?.some((c) => c.startsWith('solana:'))) ?? accounts?.[0] ?? null
-      } catch (e) {
-        const err = e as WalletError
-        if (opts.silent) return
-        throw new Error(cleanWalletError(err, wallet.name))
       }
     }
 
@@ -441,6 +463,8 @@ async function connectOnce(wallet: Wallet, opts: { silent?: boolean }) {
     })
   } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!opts.silent) {
+      // The raw code and message, so a console screenshot shows what the wallet actually said.
+      console.warn(`[wallet] ${wallet.name} connect failed`, e?.code, e?.message)
       const msg = cleanWalletError(e, wallet.name)
       set({ error: msg })
       throw new Error(msg)

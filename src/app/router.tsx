@@ -39,10 +39,11 @@ export const router = createRouter([
       { path: '/technology', element: page(() => import('@/routes/marketing/Technology')) },
       { path: '/security', element: page(() => import('@/routes/marketing/Security')) },
       { path: '/docs', element: page(() => import('@/routes/marketing/Docs')) },
-      { path: '/sign-in', element: page(() => import('@/routes/marketing/SignIn')) },
       { path: '*', element: page(() => import('@/routes/NotFound')) },
     ],
   },
+  // Standalone: just the sign-in card, no marketing header or footer.
+  { path: '/sign-in', element: page(() => import('@/routes/marketing/SignIn')) },
   {
     path: '/app',
     element: (

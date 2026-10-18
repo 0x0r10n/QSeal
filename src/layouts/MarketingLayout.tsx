@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Nav } from '@/components/marketing/Nav'
 import { Footer } from '@/components/marketing/Footer'
 import { EASE } from '@/lib/motion'
+import { crossDomainTarget, isAppSubdomain } from '@/lib/domains'
 
 function useScrollRestoration() {
   const { pathname, hash } = useLocation()
@@ -20,8 +21,15 @@ function useScrollRestoration() {
 }
 
 export function MarketingLayout() {
-  const { pathname } = useLocation()
+  const { pathname, search, hash } = useLocation()
   useScrollRestoration()
+  const elsewhere = crossDomainTarget(pathname + search + hash)
+  useEffect(() => {
+    if (elsewhere) window.location.replace(elsewhere)
+  }, [elsewhere])
+  // app.qrouter.cloud itself opens the app (AuthGuard sends signed-out visitors to sign-in).
+  if (isAppSubdomain() && pathname === '/') return <Navigate to="/app" replace />
+  if (elsewhere) return null
   return (
     <div className="relative min-h-dvh bg-ink-950">
       <a

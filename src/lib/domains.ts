@@ -54,3 +54,18 @@ export function getMarketingUrl(path = '/'): string {
 
   return cleanPath
 }
+
+/**
+ * Where this path should be served instead, or null if it belongs on the current host.
+ * qrouter.cloud is the marketing site; app.qrouter.cloud serves sign-in and the app (sign-in has to be on
+ * the app's own domain, since wallet approval and storage are kept per domain). Other hosts (localhost,
+ * previews) serve everything.
+ */
+export function crossDomainTarget(pathWithQuery: string): string | null {
+  const path = pathWithQuery.split(/[?#]/)[0]
+  // On app.qrouter.cloud, '/' itself stays and opens the app.
+  const appPath = path === '/' || path === '/sign-in' || path === '/app' || path.startsWith('/app/')
+  if (isAppSubdomain() && !appPath) return getMarketingUrl(pathWithQuery)
+  if (isMarketingDomain() && path === '/sign-in') return getAppUrl(pathWithQuery)
+  return null
+}

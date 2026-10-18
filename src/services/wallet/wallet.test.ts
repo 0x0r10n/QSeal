@@ -32,6 +32,7 @@ function fakeWallet(connect: () => Promise<{ accounts: unknown[] }> = async () =
 afterEach(async () => {
   vi.useRealTimers()
   await disconnectWallet()
+  vi.unstubAllGlobals()
 })
 
 describe('connectWallet', () => {
@@ -76,5 +77,62 @@ describe('openInWalletLinks', () => {
         href: 'https://solflare.com/ul/v1/browse/https%3A%2F%2Fapp.qrouter.cloud%2Fsign-in%3Fx%3D1?ref=https%3A%2F%2Fapp.qrouter.cloud',
       },
     ])
+  })
+})
+
+/** Phantom registers a Wallet Standard wallet and also injects window.phantom.solana. */
+function phantom({ standard, injected }: { standard: () => Promise<{ accounts: unknown[] }>; injected: (opts?: unknown) => Promise<unknown> }) {
+  const standardConnect = vi.fn(standard)
+  const injectedConnect = vi.fn(injected)
+  const { wallet } = fakeWallet(standardConnect)
+  ;(wallet as { name: string }).name = 'Phantom'
+  vi.stubGlobal('window', { phantom: { solana: { isPhantom: true, isConnected: false, connect: injectedConnect, disconnect: async () => {} } } })
+  return { wallet, standardConnect, injectedConnect }
+}
+const internalError = Object.assign(new Error('Unexpected error'), { code: -32603 })
+const rejected = Object.assign(new Error('User rejected the request.'), { code: 4001 })
+
+describe('connectWallet with Phantom', () => {
+  it('connects through Wallet Standard even when the injected provider is failing', async () => {
+    const p = phantom({ standard: async () => ({ accounts: [account] }), injected: () => Promise.reject(internalError) })
+    await connectWallet(p.wallet)
+    expect(getWalletState().account?.address).toBe(ADDRESS)
+    expect(p.injectedConnect).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the injected provider when Wallet Standard fails', async () => {
+    const p = phantom({ standard: () => Promise.reject(internalError), injected: async () => ({ publicKey: { toBase58: () => ADDRESS } }) })
+    await connectWallet(p.wallet)
+    expect(getWalletState().account?.address).toBe(ADDRESS)
+  })
+
+  it('does not try another way after the user rejects', async () => {
+    const p = phantom({ standard: () => Promise.reject(rejected), injected: async () => ({ publicKey: { toBase58: () => ADDRESS } }) })
+    await expect(connectWallet(p.wallet)).rejects.toThrow(/cancelled/i)
+    expect(p.injectedConnect).not.toHaveBeenCalled()
+  })
+
+  it('restores silently through the injected provider (onlyIfTrusted), never prompting via Wallet Standard', async () => {
+    const p = phantom({ standard: async () => ({ accounts: [account] }), injected: async () => ({ publicKey: { toBase58: () => ADDRESS } }) })
+    await connectWallet(p.wallet, { silent: true })
+    expect(p.injectedConnect).toHaveBeenCalledWith({ onlyIfTrusted: true })
+    expect(p.standardConnect).not.toHaveBeenCalled()
+    expect(getWalletState().account?.address).toBe(ADDRESS)
+  })
+})
+
+describe('overlapping connects', () => {
+  it('a click during a pending connect waits for it instead of sending the wallet a second request', async () => {
+    let finish!: () => void
+    const { wallet } = fakeWallet(() => new Promise((r) => (finish = () => r({ accounts: [account] }))))
+    const connect = vi.mocked(wallet.features['standard:connect'] as { connect: () => Promise<unknown> }).connect
+    const spy = vi.fn(connect)
+    ;(wallet.features['standard:connect'] as { connect: unknown }).connect = spy
+    const first = connectWallet(wallet, { silent: true })
+    const second = connectWallet(wallet)
+    finish()
+    await Promise.all([first, second])
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(getWalletState().account?.address).toBe(ADDRESS)
   })
 })

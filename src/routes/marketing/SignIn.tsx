@@ -9,6 +9,7 @@ import { looksLikeKey, setAccessKey } from '@/services/api/credentials'
 import { connectWallet, useWallet } from '@/services/wallet/wallet'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { EASE } from '@/lib/motion'
+import { crossDomainTarget } from '@/lib/domains'
 
 export default function SignIn() {
   useDocumentTitle('Sign In')
@@ -28,6 +29,12 @@ export default function SignIn() {
     }
   }, [account, navigate, target])
 
+  // Sign-in belongs on app.qrouter.cloud (wallet approval is per domain); move there if opened on qrouter.cloud.
+  const elsewhere = crossDomainTarget(location.pathname + location.search)
+  useEffect(() => {
+    if (elsewhere) window.location.replace(elsewhere)
+  }, [elsewhere])
+
   const phantomWallet = available.find((w) => w.name.toLowerCase().includes('phantom'))
   const solflareWallet = available.find((w) => w.name.toLowerCase().includes('solflare'))
   const otherWallets = available.filter(
@@ -46,6 +53,7 @@ export default function SignIn() {
 
   const activeError = connectErr || globalError
 
+  if (elsewhere) return null
   return (
     <section className="grain relative isolate flex min-h-[100svh] items-center justify-center overflow-hidden px-4 py-8">
       <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_50%_50%_at_50%_40%,#1a1a1f,#060607_70%)]" />
